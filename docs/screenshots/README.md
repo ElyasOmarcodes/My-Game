@@ -15,3 +15,20 @@ uses. Regenerate with `python3 tools/mockups/build_mockups.py && tools/mockups/s
 | 08 | Pause | `PauseScreen.cs` |
 | 09 | Results | `ResultsScreen.cs` |
 | 10 | Settings | `SettingsScreen.cs` |
+
+## World, models and the playable build
+
+Rendered by the WebGL engine in `engine/` — the same code the preview APK runs,
+so these are what the game actually looks like, not mockups.
+
+| File | What it shows |
+| --- | --- |
+| `3d-city-aerial.png` | The whole 460 m map and its five districts |
+| `3d-city-street.png` | Downtown avenue at dusk, agents in scale |
+| `3d-city-park.png` | Park district — pond, paths, tree cover |
+| `3d-city-industrial.png` | Warehouse and stacked shipping containers |
+| `3d-agents.png` | The four body archetypes |
+| `3d-weapons.png` | The five weapon models |
+| `3d-gameplay.png` | The playable build with its HUD and touch controls |
+
+Regenerate with `tools/mockups/shoot3d.sh` and `tools/mockups/shootgame.sh`.
