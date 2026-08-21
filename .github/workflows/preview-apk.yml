@@ -10,6 +10,7 @@ on:
   workflow_dispatch:
   push:
     branches: [ "claude/android-multiplayer-game-st4h00", "main" ]
+    tags: [ "preview-v*" ]
     paths-ignore: [ "docs/**", "**/*.md" ]
 
 concurrency:
@@ -24,6 +25,8 @@ jobs:
     name: Build preview APK
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: write        # needed to attach the APK to a release
 
     steps:
       - uses: actions/checkout@v4
@@ -100,3 +103,25 @@ jobs:
           path: dist/*
           compression-level: 0
           retention-days: 60
+
+      # A release gives a direct .apk link, which is far easier to install from a
+      # phone than an Actions artifact (those always download as a zip).
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/preview-v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          name: Battle of Agents — preview ${{ github.ref_name }}
+          body: |
+            Playable preview build of the free-roam city.
+
+            **Install:** download the `.apk`, open it, and allow "install unknown
+            apps" when your phone asks. It is signed with the Android debug key.
+
+            - Free-roam the procedural city in third person
+            - Four agent archetypes and five weapons
+            - Wi-Fi squads: tap **Host a squad**; other phones on the same
+              network see it in the list automatically (UDP 47777)
+
+            No internet permission is requested — the game only talks to the
+            local network.

@@ -19,6 +19,47 @@ the same router discovers it automatically and joins.
 Every page is in [`docs/screenshots/`](docs/screenshots): splash, main menu, host a
 squad, Wi-Fi browser, room lobby, agent select, in-match HUD, pause, results, settings.
 
+## Two builds, one game
+
+| | Unity build | Preview build |
+| --- | --- | --- |
+| Engine | Unity 2022.3 · URP · C# | WebGL engine in `engine/`, native Android shell |
+| Workflow | `.github/workflows/android-build.yml` | `.github/workflows/preview-apk.yml` |
+| Needs a Unity licence | **yes** | no |
+| Status | waiting on a licence secret | **builds on every push** |
+
+Unity retired manual Personal-licence activation — the page at
+`license.unity3d.com/manual` now only accepts Pro/Plus serials — so the Unity
+pipeline cannot produce a build without account credentials. Rather than leave
+nothing to install, the same city, agents and weapons also run as a WebGL engine
+wrapped in a small Android shell, and that path needs no licence and no secrets.
+
+Both speak the **same LAN protocol**, so a phone running the preview APK and a
+phone running the Unity build discover each other's rooms.
+
+### Getting the Unity build going
+
+Add either secret and `android-build.yml` starts producing the Unity APK:
+
+| Secret | What it is |
+| --- | --- |
+| `UNITY_LICENSE` | Contents of a `.ulf` licence file — the Personal route |
+| `UNITY_SERIAL` + `UNITY_EMAIL` + `UNITY_PASSWORD` | A Pro/Plus serial and the account that owns it |
+
+Since Unity closed manual Personal activation, the way to get a `.ulf` is to let
+Unity Hub create one and copy it off disk:
+
+1. Install Unity Hub on your own machine and sign in (a free Personal licence is
+   granted automatically).
+2. Copy the whole contents of `Unity_lic.ulf`:
+   - Windows — `C:\ProgramData\Unity\Unity_lic.ulf`
+   - macOS — `/Library/Application Support/Unity/Unity_lic.ulf`
+   - Linux — `~/.local/share/unity3d/Unity/Unity_lic.ulf`
+3. Paste it into the `UNITY_LICENSE` secret.
+
+Until then the workflow reports "build skipped" with these steps in its summary
+instead of failing.
+
 ## How the Wi-Fi multiplayer works
 
 ```
@@ -66,32 +107,23 @@ Unity -batchmode -quit -projectPath . \
 
 ## Building in CI
 
-`.github/workflows/android-build.yml` builds on every push to the feature branch, and
-on demand from the Actions tab.
+Two workflows, described in **Two builds, one game** above:
 
-**The one thing it needs is a Unity licence.** Unity refuses to start in batch mode
-unactivated, so without it the build cannot run at all. Getting one is free and takes
-a couple of minutes, once:
+```
+preview-apk.yml    → android/  → app-release.apk   (no secrets, every push)
+android-build.yml  → Unity     → BattleOfAgents.apk (needs a Unity licence)
+```
 
-1. Actions ▸ **Unity licence request** ▸ *Run workflow*.
-2. Download the `Unity_alf` artifact from that run and unzip it.
-3. Upload the `.alf` at <https://license.unity3d.com/manual>, choose **Unity Personal**,
-   download the `.ulf`.
-4. Settings ▸ Secrets and variables ▸ Actions ▸ *New repository secret*:
-   `UNITY_LICENSE` = the entire contents of the `.ulf` file.
+Both sign with the **debug key**, so the APK installs on any phone with
+"install unknown apps" enabled — the right choice for sideloading and LAN
+testing. A Play Store upload would need a release key instead.
 
-Until that secret exists, the workflow reports "build skipped" with these steps in its
-summary instead of failing with Unity's cryptic `Missing Unity License File` error.
+To build the preview APK locally:
 
-| Secret | Required | What it is |
-| --- | --- | --- |
-| `UNITY_LICENSE` | yes | Contents of the `.ulf` personal licence file |
-| `UNITY_SERIAL` | alternative | Serial number instead, if you have Unity Plus/Pro |
-| `UNITY_EMAIL` / `UNITY_PASSWORD` | with serial | Unity account for serial activation |
-
-No keystore secrets: **the APK is signed with Unity's debug key**, so it installs on any
-phone with "install unknown apps" enabled. That is the right choice for sideloading and
-LAN testing — a Play Store upload would need a release key instead.
+```bash
+cd android && gradle assembleRelease      # or ./gradlew if you generate a wrapper
+# → android/app/build/outputs/apk/release/app-release.apk
+```
 
 ## Keeping the download small
 

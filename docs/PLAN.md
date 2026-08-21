@@ -43,17 +43,21 @@
 
 ## هغه څه چې ستاسو له خوا ته اړتیا لري
 
-**یوازې یو شی**: د `UNITY_LICENSE` راز. Unity پرته له جواز په CI کې نه چلیږي.
+**د Unity لپاره**: Unity د `.alf` له لارې د Personal جواز جوړول بند کړل. اوس یوازینۍ
+لار دا ده چې جواز د Unity Hub له لارې پخپله جوړ کړئ او فایل یې کاپي کړئ:
 
-۱. Actions ▸ **Unity licence request** ▸ Run workflow
-۲. د `Unity_alf` آرټیفکټ ښکته کړئ او unzip یې کړئ
-۳. `.alf` فایل په <https://license.unity3d.com/manual> کې پورته کړئ، **Unity Personal**
-   وټاکئ، او `.ulf` ښکته کړئ
-۴. د `.ulf` ټوله منځپانګه کاپي کړئ → Settings ▸ Secrets and variables ▸ Actions ▸
-   نوی راز په نامه **`UNITY_LICENSE`**
+۱. په خپل کمپیوټر کې Unity Hub ولیکئ او ننوځئ (Personal جواز پخپله ورکول کیږي)
+۲. د `Unity_lic.ulf` فایل ټوله منځپانګه کاپي کړئ:
+   - Windows — `C:\ProgramData\Unity\Unity_lic.ulf`
+   - macOS — `/Library/Application Support/Unity/Unity_lic.ulf`
+   - Linux — `~/.local/share/unity3d/Unity/Unity_lic.ulf`
+۳. په GitHub کې یې د **`UNITY_LICENSE`** راز په توګه کېږدئ
 
-کيسټور ته اړتیا نشته — APK د Unity په **ډیباګ کيلي** لاسلیک کیږي، نو په هر تلیفون کې
-د "unknown apps" اجازې سره نصبیږي.
+**خو د APK لپاره دې ته اړتیا نشته**: د `preview-apk.yml` ورک‌فلو پرته له هر راز نه
+APK جوړوي — هماغه ښار، هماغه ایجنټان، هماغه د وای‌فای کوټې.
+
+کيسټور ته اړتیا نشته — APK د **ډیباګ کيلي** سره لاسلیک کیږي، نو په هر تلیفون کې د
+"unknown apps" اجازې سره نصبیږي.
 
 ## د پورټونو لیست
 
