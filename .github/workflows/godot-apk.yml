@@ -142,6 +142,42 @@ jobs:
             exit 1
           fi
 
+      # The only place the real game can be photographed: this sandbox has no
+      # GPU, so the renders happen here on llvmpipe and are committed back.
+      - name: Render screenshots
+        if: github.ref_name == 'claude/android-multiplayer-game-st4h00'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb libgl1 libglx-mesa0 libgl1-mesa-dri
+
+          export BOA_SHOT_DIR="$PWD/docs/screenshots"
+          mkdir -p "$BOA_SHOT_DIR"
+
+          timeout 180 xvfb-run -a --server-args="-screen 0 1920x1080x24" \
+            godot --path godot --rendering-method gl_compatibility \
+              --rendering-driver opengl3 --resolution 1920x1080 \
+              res://scenes/Shots.tscn > /tmp/shots.log 2>&1 || true
+          tail -30 /tmp/shots.log
+          ls -la "$BOA_SHOT_DIR" | head -20
+
+      - name: Commit the screenshots
+        if: github.ref_name == 'claude/android-multiplayer-game-st4h00'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          if [ -z "$(git status --porcelain docs/screenshots)" ]; then
+            echo "no screenshot changes"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/screenshots
+          git commit -m "Render Godot screenshots from build ${{ github.run_number }}"
+          git pull --rebase --autostash origin "${{ github.ref_name }}"
+          git push origin HEAD:"${{ github.ref_name }}"
+
       - name: Export the APK
         run: |
           set -euo pipefail
