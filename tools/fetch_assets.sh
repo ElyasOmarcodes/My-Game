@@ -56,9 +56,21 @@ sparse_clone "https://github.com/ETdoFresh/kenney.nl.git" kenney \
 sparse_clone "https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0.git" \
   kaykit "addons"
 
-# --- buildings and streets ----------------------------------------------------
+# --- what the kits actually contain -------------------------------------------
 
 TOWN="$WORK/kenney/fantasy-town-kit-1.0"
+KAY="$WORK/kaykit"
+
+echo
+echo "=== town kit models (first 60) ==="
+find "$TOWN" -iname '*.glb' -printf '%f\n' 2>/dev/null | sort | head -60
+echo "=== town kit total: $(find "$TOWN" -iname '*.glb' 2>/dev/null | wc -l) ==="
+echo
+echo "=== character kit models ==="
+find "$KAY" \( -iname '*.glb' -o -iname '*.gltf' \) -printf '%f\n' 2>/dev/null | sort | head -40
+echo
+
+# --- buildings and streets ----------------------------------------------------
 collect "$TOWN" buildings "building*.glb"
 collect "$TOWN" buildings "house*.glb"
 collect "$TOWN" buildings "tower*.glb"
@@ -84,7 +96,6 @@ collect "$NATURE" props "campfire*.glb" 2
 
 # --- characters and weapons ---------------------------------------------------
 
-KAY="$WORK/kaykit"
 collect "$KAY" characters "*.glb"
 collect "$KAY" weapons "sword*.gltf"
 collect "$KAY" weapons "axe*.gltf"

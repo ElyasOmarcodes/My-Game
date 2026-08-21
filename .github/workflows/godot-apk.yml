@@ -214,6 +214,9 @@ jobs:
 
       - name: Size report
         run: |
+          echo "===== asset inventory ====="
+          cat /tmp/assets.log
+          echo "===== end inventory ====="
           apk=${{ steps.apk.outputs.bytes }}
           zip=${{ steps.zip.outputs.zip_bytes }}
           {

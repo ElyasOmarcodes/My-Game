@@ -42,9 +42,16 @@ func _build_environment() -> void:
 	var light := DirectionalLight3D.new()
 	light.rotation_degrees = Vector3(-36, 44, 0)
 	light.light_color = Color(1.0, 0.89, 0.76)
-	light.light_energy = 1.2
+	light.light_energy = 1.9
 	light.shadow_enabled = true
 	add_child(light)
+
+	var fill := DirectionalLight3D.new()
+	fill.rotation_degrees = Vector3(-16, -128, 0)
+	fill.light_color = Color(0.62, 0.74, 1.0)
+	fill.light_energy = 0.7
+	fill.shadow_enabled = false
+	add_child(fill)
 
 	var environment := Environment.new()
 	environment.background_mode = Environment.BG_SKY
@@ -58,7 +65,7 @@ func _build_environment() -> void:
 	environment.sky.sky_material = sky_material
 
 	environment.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	environment.ambient_light_energy = 1.0
+	environment.ambient_light_energy = 2.2
 	environment.fog_enabled = true
 	environment.fog_light_color = Color(0.17, 0.21, 0.29)
 	environment.fog_density = 0.004
