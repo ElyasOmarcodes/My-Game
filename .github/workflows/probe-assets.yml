@@ -1,8 +1,8 @@
 name: Probe CC0 assets
 
-# One-shot reconnaissance: lists what is actually inside the Kenney CC0 asset
-# repository so the real fetch can pin exact paths instead of guessing at them.
-# Safe to delete once the asset list in godot/assets.txt is settled.
+# Reconnaissance for the CC0 model packs. The sandbox this project is developed
+# in cannot reach anything outside its own repository, so the exact download
+# URLs have to be discovered on a runner and pinned afterwards.
 
 on:
   workflow_dispatch:
@@ -12,36 +12,59 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Sparse-clone the asset index
+      - name: Which hosts answer at all
         run: |
-          set -euo pipefail
-          # Blobless + sparse: fetches the tree listing without any file contents.
-          git clone --filter=blob:none --no-checkout --depth 1 \
-            https://github.com/KenneyNL/Assets.git kenney
-          cd kenney
-          git sparse-checkout init --cone
+          {
+            echo "## Reachability"
+            echo '```'
+            for host in kenney.nl github.com api.github.com poly.pizza \
+                        opengameart.org quaternius.com kaylousberg.itch.io; do
+              code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "https://$host/" || echo FAIL)
+              echo "$host -> $code"
+            done
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
-          echo "## Top level" >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
-          git ls-tree --name-only HEAD | head -100 >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
+      - name: Kenney's GitHub account
+        run: |
+          {
+            echo "## github.com/KenneyNL repositories"
+            echo '```'
+            curl -sS --max-time 30 'https://api.github.com/users/KenneyNL/repos?per_page=100' \
+              | jq -r '.[]? | "\(.full_name)  (\(.size) KB)"' | head -60 || echo "(query failed)"
+            echo '```'
 
-          echo "## Packs that look relevant" >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
-          git ls-tree --name-only HEAD \
-            | grep -Ei 'city|building|road|character|weapon|blaster|survival|tower|nature|prototype' \
-            >> "$GITHUB_STEP_SUMMARY" || echo "(no match)" >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo "## Search: kenney assets"
+            echo '```'
+            curl -sS --max-time 30 'https://api.github.com/search/repositories?q=kenney+assets&per_page=15' \
+              | jq -r '.items[]? | "\(.full_name)  \(.size) KB  \(.description // "")"' || echo "(query failed)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
-          echo "## Inside the first matching packs" >> "$GITHUB_STEP_SUMMARY"
-          for pack in $(git ls-tree --name-only HEAD | grep -Ei 'city kit|characters|blaster' | head -6); do
-            echo "### $pack" >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-            git ls-tree -r --name-only HEAD "$pack" | head -40 >> "$GITHUB_STEP_SUMMARY"
-            echo "..." >> "$GITHUB_STEP_SUMMARY"
-            git ls-tree -r --name-only HEAD "$pack" | wc -l >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-          done
+      - name: Kenney asset pages and their download links
+        run: |
+          {
+            echo "## kenney.nl download links"
+            echo '```'
+            for slug in city-kit-commercial city-kit-suburban city-kit-roads \
+                        blaster-kit blocky-characters mini-characters-1 \
+                        weapon-pack survival-kit; do
+              echo "--- $slug"
+              curl -sSL --max-time 30 "https://kenney.nl/assets/$slug" \
+                | grep -oE 'href="[^"]*\.zip"' | sort -u | head -5 || echo "  (no zip link found)"
+            done
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
-          echo "## Total entries" >> "$GITHUB_STEP_SUMMARY"
-          git ls-tree -r --name-only HEAD | wc -l >> "$GITHUB_STEP_SUMMARY"
+      - name: Other CC0 sources worth pinning
+        run: |
+          {
+            echo "## Kay Lousberg / Quaternius style kits on GitHub"
+            echo '```'
+            for q in "kaykit" "quaternius" "cc0 3d models glb"; do
+              echo "--- search: $q"
+              curl -sS --max-time 30 "https://api.github.com/search/repositories?q=$(echo "$q" | tr ' ' '+')&per_page=8" \
+                | jq -r '.items[]? | "\(.full_name)  \(.size) KB  \(.license.spdx_id // "no-license")"' || true
+            done
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
