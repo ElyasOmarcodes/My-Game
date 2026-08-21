@@ -45,3 +45,10 @@ crashlytics-build.properties
 
 # Node (mockup tooling)
 node_modules/
+
+# Android build outputs and the engine copy Gradle stages into the app
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+engine-assets/

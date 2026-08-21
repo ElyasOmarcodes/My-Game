@@ -242,3 +242,63 @@ export function buildWeapon(id, origin, yaw, accentColor, intoGroups) {
   }
   return Object.values(groups);
 }
+
+
+/// Builds an agent as separate, animatable parts, each with its geometry around
+/// its own joint so a single matrix per part drives the pose.
+///
+/// The still-image builder above bakes one pose into world space; this one is
+/// what the running game uses, where the legs have to swing every frame.
+export function buildAgentRig(id, teamColor = THEME.teamAlpha) {
+  const def = agent(id);
+  const bone = SKELETON[def.archetype];
+
+  const make = () => ({ groups: {}, push(g) { return (this.groups[g.name] = this.groups[g.name] || g); } });
+  const body = make(), legL = make(), legR = make(), armR = make(), armL = make();
+
+  const bodyKey = { heavy: 'armour', scout: 'suit', engineer: 'overall', marksman: 'coat' }[def.archetype];
+
+  const addTo = (part, group, centre, size, pitch = 0) => group.add(centre, size, 0, pitch);
+  const shell = body.push(surfaceGroup(bodyKey, 'rig_' + bodyKey));
+  const accent = body.push(glowGroup('rig_accent_' + def.id, def.accent));
+  const team = body.push(glowGroup('rig_team_' + teamColor.join('_'), teamColor, 2.0));
+  const cloth = body.push(surfaceGroup('fabric', 'rig_fabric'));
+  const steel = body.push(surfaceGroup('steel', 'rig_steel'));
+
+  DETAIL[def.archetype]({
+    add: (group, centre, size, pitch = 0) => addTo(body, group, centre, size, pitch),
+    shell, accent, team, cloth, steel,
+    push: (g) => body.push(g),
+    surfaceGroup: (key, name) => surfaceGroup(key, 'rig_' + name.replace('agent_', '')),
+  });
+
+  // Limbs live in joint space: the pivot is the origin and the limb hangs down -Y.
+  const limbGeometry = (part, matKey, thickness, length, boot) => {
+    const group = part.push(surfaceGroup(matKey, 'rig_limb_' + matKey));
+    group.add([0, -length / 2, 0], [thickness, length, thickness]);
+    if (boot) group.add([0, -length + 0.05, 0.04], [thickness + 0.03, 0.10, thickness + 0.10]);
+    return group;
+  };
+
+  const legKey = bone.legMat || bodyKey;
+  limbGeometry(legL, legKey, bone.legThick, bone.legLen, true);
+  limbGeometry(legR, legKey, bone.legThick, bone.legLen, true);
+  limbGeometry(armL, bodyKey, bone.armThick, bone.armLen, false);
+  limbGeometry(armR, bodyKey, bone.armThick, bone.armLen, false);
+
+  // The weapon hangs off the end of the firing arm, levelled against it.
+  const weaponGroups = {};
+  buildWeapon(def.weapon, [0, -bone.armLen - 0.02, 0.12], 0, def.accent, weaponGroups);
+  for (const g of Object.values(weaponGroups)) armR.groups[g.name] = g;
+
+  return {
+    def,
+    height: bone.shoulderY + 0.4,
+    aimPitch: AIM_PITCH,
+    body: Object.values(body.groups),
+    legLeft: { groups: Object.values(legL.groups), joint: [-bone.hipX, bone.hipY, 0] },
+    legRight: { groups: Object.values(legR.groups), joint: [bone.hipX, bone.hipY, 0] },
+    armLeft: { groups: Object.values(armL.groups), joint: [-bone.shoulderX, bone.shoulderY, 0] },
+    armRight: { groups: Object.values(armR.groups), joint: [bone.shoulderX, bone.shoulderY, 0] },
+  };
+}

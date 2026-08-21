@@ -8,12 +8,17 @@ export const VERT = `
 attribute vec3 aPos;
 attribute vec3 aNormal;
 uniform mat4 uViewProj;
+uniform mat4 uModel;
 varying vec3 vNormal;
 varying vec3 vWorld;
 void main() {
-  vNormal = aNormal;
-  vWorld = aPos;
-  gl_Position = uViewProj * vec4(aPos, 1.0);
+  // Static geometry passes identity; characters pass their bone matrix. Model
+  // matrices here are rotation plus translation only, so the upper 3x3 is a
+  // valid normal matrix without inverting anything.
+  vec4 world = uModel * vec4(aPos, 1.0);
+  vNormal = mat3(uModel) * aNormal;
+  vWorld = world.xyz;
+  gl_Position = uViewProj * world;
 }`;
 
 export const FRAG = `
@@ -78,7 +83,7 @@ export function createProgram(gl) {
     throw new Error(gl.getProgramInfoLog(program));
 
   const uniforms = {};
-  for (const name of ['uViewProj', 'uColor', 'uEmissive', 'uSunDir', 'uSunColor',
+  for (const name of ['uViewProj', 'uModel', 'uColor', 'uEmissive', 'uSunDir', 'uSunColor',
     'uSkyColor', 'uGroundColor', 'uFogColor', 'uCamPos', 'uFogDensity', 'uSpecular'])
     uniforms[name] = gl.getUniformLocation(program, name);
 
@@ -113,6 +118,24 @@ export const mat4 = {
       x[1], y[1], z[1], 0,
       x[2], y[2], z[2], 0,
       -dot(x, eye), -dot(y, eye), -dot(z, eye), 1,
+    ]);
+  },
+
+  identity() {
+    return new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+  },
+
+  /// Translate, then yaw, then pitch — the order a limb joint needs.
+  compose(position, yawDeg, pitchDeg = 0) {
+    const ry = yawDeg * Math.PI / 180, rx = pitchDeg * Math.PI / 180;
+    const cy = Math.cos(ry), sy = Math.sin(ry);
+    const cx = Math.cos(rx), sx = Math.sin(rx);
+    // R = Ry * Rx
+    return new Float32Array([
+      cy, 0, -sy, 0,
+      sy * sx, cx, cy * sx, 0,
+      sy * cx, -sx, cy * cx, 0,
+      position[0], position[1], position[2], 1,
     ]);
   },
 

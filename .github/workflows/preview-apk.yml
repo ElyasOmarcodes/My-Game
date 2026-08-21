@@ -1,0 +1,102 @@
+name: Preview APK
+
+# Builds the installable preview APK: the WebGL engine from /engine wrapped in a
+# native Android shell. No Unity, no licence, no secrets — it runs on every push.
+#
+# The Unity build in android-build.yml stays the main pipeline; this exists so
+# there is always something to install and play while that one waits on a licence.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "claude/android-multiplayer-game-st4h00", "main" ]
+    paths-ignore: [ "docs/**", "**/*.md" ]
+
+concurrency:
+  group: preview-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  BOA_VERSION: 0.1.0
+
+jobs:
+  build:
+    name: Build preview APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Build release APK (debug-signed)
+        working-directory: android
+        run: |
+          gradle --no-daemon assembleRelease \
+            -PboaVersion=${{ env.BOA_VERSION }} \
+            -PboaBuildNumber=${{ github.run_number }}
+
+      - name: Locate the APK
+        id: apk
+        run: |
+          set -euo pipefail
+          APK="$(find android/app/build/outputs/apk -name '*.apk' -print -quit)"
+          if [ -z "$APK" ]; then echo "::error::no APK produced"; exit 1; fi
+          echo "path=$APK" >> "$GITHUB_OUTPUT"
+          echo "bytes=$(stat -c%s "$APK")" >> "$GITHUB_OUTPUT"
+
+      - name: Verify alignment and signature
+        run: |
+          BT="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
+          "$BT/zipalign" -c -v 4 "${{ steps.apk.outputs.path }}" | tail -2
+          "$BT/apksigner" verify --print-certs "${{ steps.apk.outputs.path }}"
+
+      # The APK is already a zip, so re-deflating it would break its signing
+      # block. It is wrapped in a maximally compressed archive instead; the APK
+      # inside stays byte-identical and installable.
+      - name: Package a max-compressed zip
+        id: zip
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq && sudo apt-get install -y -qq p7zip-full
+          NAME="BattleOfAgents-preview-${{ env.BOA_VERSION }}-${{ github.run_number }}"
+          mkdir -p dist
+          cp "${{ steps.apk.outputs.path }}" "dist/$NAME.apk"
+          cd dist
+          7z a -tzip -mx=9 -mfb=258 -mpass=15 -mmt=on "$NAME.zip" "$NAME.apk"
+          echo "zip_bytes=$(stat -c%s "$NAME.zip")" >> "$GITHUB_OUTPUT"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Size report
+        run: |
+          apk=${{ steps.apk.outputs.bytes }}
+          zip=${{ steps.zip.outputs.zip_bytes }}
+          {
+            echo "### Battle of Agents — preview APK ${{ github.run_number }}"
+            echo ""
+            echo "| artefact | size |"
+            echo "| --- | ---: |"
+            printf "| APK | %.2f MB |\n" "$(echo "$apk/1048576" | bc -l)"
+            printf "| ZIP (7z -mx=9) | %.2f MB |\n" "$(echo "$zip/1048576" | bc -l)"
+            echo ""
+            echo "R8-shrunk, debug-signed. Install with \"unknown apps\" enabled."
+            echo "Wi-Fi room discovery runs on UDP 47777, the same beacon the Unity build uses."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.zip.outputs.name }}
+          path: dist/*
+          compression-level: 0
+          retention-days: 60

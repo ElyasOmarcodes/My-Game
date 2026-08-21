@@ -176,7 +176,16 @@ export class Renderer {
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 
-  render(groups, camera) {
+  /// `items` is either a flat list of material groups (drawn in world space) or
+  /// a list of { groups, matrix } for anything that moves.
+  render(items, camera) {
+    const list = Array.isArray(items) && items.length && items[0].mesh !== undefined
+      ? [{ groups: items, matrix: null }]
+      : items;
+    return this.renderItems(list, camera);
+  }
+
+  renderItems(items, camera) {
     const { gl } = this;
     this.resize();
 
@@ -205,22 +214,29 @@ export class Renderer {
     gl.uniform3fv(p.uniforms.uCamPos, camera.position);
     gl.uniform1f(p.uniforms.uFogDensity, this.env.fogDensity);
 
+    const identity = mat4.identity();
     let drawCalls = 0;
-    for (const group of groups) {
-      if (!group.gpu) continue;
-      gl.uniform3fv(p.uniforms.uColor, group.color);
-      gl.uniform3fv(p.uniforms.uEmissive, group.emissive);
-      gl.uniform1f(p.uniforms.uSpecular, group.specular);
 
-      gl.bindBuffer(gl.ARRAY_BUFFER, group.gpu.vbo);
-      gl.enableVertexAttribArray(p.aPos);
-      gl.vertexAttribPointer(p.aPos, 3, gl.FLOAT, false, 24, 0);
-      gl.enableVertexAttribArray(p.aNormal);
-      gl.vertexAttribPointer(p.aNormal, 3, gl.FLOAT, false, 24, 12);
+    for (const item of items) {
+      if (!item || !item.groups) continue;
+      gl.uniformMatrix4fv(p.uniforms.uModel, false, item.matrix || identity);
 
-      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, group.gpu.ibo);
-      gl.drawElements(gl.TRIANGLES, group.gpu.indexCount, group.gpu.indexType, 0);
-      drawCalls++;
+      for (const group of item.groups) {
+        if (!group.gpu) continue;
+        gl.uniform3fv(p.uniforms.uColor, group.color);
+        gl.uniform3fv(p.uniforms.uEmissive, group.emissive);
+        gl.uniform1f(p.uniforms.uSpecular, group.specular);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, group.gpu.vbo);
+        gl.enableVertexAttribArray(p.aPos);
+        gl.vertexAttribPointer(p.aPos, 3, gl.FLOAT, false, 24, 0);
+        gl.enableVertexAttribArray(p.aNormal);
+        gl.vertexAttribPointer(p.aNormal, 3, gl.FLOAT, false, 24, 12);
+
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, group.gpu.ibo);
+        gl.drawElements(gl.TRIANGLES, group.gpu.indexCount, group.gpu.indexType, 0);
+        drawCalls++;
+      }
     }
     this.drawCalls = drawCalls;
 
