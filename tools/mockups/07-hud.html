@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Battle of Agents — In-match HUD</title><link rel="stylesheet" href="theme.css"></head>
+<body><div class="page">
+<div style="position:absolute;inset:0;background:
+  linear-gradient(160deg,#0a1524 0%,#0d1c2b 42%,#1a1410 100%)"></div>
+<div style="position:absolute;inset:0;background:
+  radial-gradient(700px 420px at 68% 38%, rgba(255,178,59,.16), transparent 70%),
+  radial-gradient(900px 520px at 20% 78%, rgba(59,232,255,.10), transparent 70%)"></div>
+<!-- blocked-out skyline so the HUD reads against real scene contrast -->
+<div style="position:absolute;left:0;right:0;bottom:0;height:44%;background:
+  linear-gradient(180deg, rgba(3,6,10,.1), rgba(3,6,10,.92))"></div>
+<div style="position:absolute;left:6%;bottom:22%;width:220px;height:300px;background:rgba(4,8,14,.85)"></div>
+<div style="position:absolute;left:22%;bottom:22%;width:160px;height:420px;background:rgba(6,11,18,.8)"></div>
+<div style="position:absolute;right:14%;bottom:22%;width:280px;height:360px;background:rgba(5,9,15,.85)"></div>
+
+<div class="hud">
+  <!-- objective bar -->
+  <div style="position:absolute;left:50%;transform:translateX(-50%);top:20px;width:680px;height:104px;
+    background:rgba(5,7,12,.55);display:flex;align-items:center;padding:0 28px;gap:24px" class="clip">
+    <div style="width:120px;text-align:center;font-size:54px;font-weight:700;color:var(--team-a)">14</div>
+    <div class="col grow" style="align-items:center">
+      <div style="font-size:46px;font-weight:700;letter-spacing:.06em">03:12</div>
+      <div class="cap" style="font-size:18px">Team deathmatch</div>
+    </div>
+    <div style="width:120px;text-align:center;font-size:54px;font-weight:700;color:var(--team-b)">11</div>
+  </div>
+
+  <!-- kill feed -->
+  <div class="col" style="position:absolute;right:140px;top:40px;width:520px;gap:8px;align-items:flex-end"><div style="font-size:21px;text-align:right;color:var(--text-mid)">Zaman &nbsp;⟶&nbsp; Omid &nbsp;&nbsp;rifle</div><div style="font-size:21px;text-align:right;color:var(--cyan)"><b>Agent-317</b> &nbsp;⟶&nbsp; Bilal &nbsp;&nbsp;headshot</div><div style="font-size:21px;text-align:right;color:var(--team-b)">Nawid &nbsp;⟶&nbsp; Sahar &nbsp;&nbsp;marksman</div></div>
+
+  <!-- pause -->
+  <div class="btn ghost" style="position:absolute;right:24px;top:24px;width:96px;height:64px">II</div>
+
+  <!-- crosshair -->
+  <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)">
+    <div style="width:6px;height:6px;background:rgba(59,232,255,.9);margin:auto"></div>
+    <div style="position:absolute;left:2px;top:-35px;width:2px;height:18px;background:rgba(59,232,255,.7)"></div>
+    <div style="position:absolute;left:2px;top:23px;width:2px;height:18px;background:rgba(59,232,255,.7)"></div>
+    <div style="position:absolute;top:2px;left:-35px;height:2px;width:18px;background:rgba(59,232,255,.7)"></div>
+    <div style="position:absolute;top:2px;left:23px;height:2px;width:18px;background:rgba(59,232,255,.7)"></div>
+  </div>
+
+  <!-- vitals -->
+  <div class="col" style="position:absolute;left:36px;bottom:56px;width:520px;gap:8px">
+    <div class="row" style="height:34px"><div class="cy" style="font-size:26px;font-weight:700;letter-spacing:.16em">VANGUARD</div>
+      <div class="grow"></div><div class="am" style="font-size:22px;font-weight:700">3x STREAK</div></div>
+    <div style="font-size:44px;font-weight:700">86</div>
+    <div class="bar" style="height:10px"><i style="width:86%;background:var(--success)"></i></div><div class="bar" style="height:6px"><i style="width:52%;background:var(--cyan)"></i></div>
+    <div style="height:6px"></div>
+    <div class="cap" style="font-size:19px">Bulwark dash</div>
+    <div class="bar" style="height:6px"><i style="width:64%;background:var(--amber)"></i></div>
+  </div>
+
+  <!-- ammo -->
+  <div style="position:absolute;right:560px;bottom:44px;text-align:right">
+    <div style="font-size:52px;font-weight:700">24<span class="low" style="font-size:30px"> / 120</span></div>
+    <div class="cap" style="font-size:19px">MK-7 CARBINE</div>
+  </div>
+
+  <!-- touch controls -->
+  <div style="position:absolute;left:96px;bottom:136px;width:230px;height:230px;border-radius:50%;
+    background:rgba(85,103,125,.10);border:1px solid rgba(85,103,125,.25)"></div>
+  <div style="position:absolute;left:163px;bottom:203px;width:96px;height:96px;border-radius:50%;
+    background:rgba(59,232,255,.35)"></div>
+  <div style="position:absolute;right:80px;bottom:90px;width:200px;height:200px;border-radius:50%;
+    background:rgba(255,77,94,.16);border:2px solid rgba(255,77,94,.7);display:flex;align-items:center;
+    justify-content:center;font-size:26px;font-weight:700;letter-spacing:.2em;color:var(--danger)">FIRE</div>
+  <div style="position:absolute;right:335px;bottom:235px;width:130px;height:130px;border-radius:50%;
+    background:rgba(255,178,59,.16);border:2px solid rgba(255,178,59,.7);display:flex;align-items:center;
+    justify-content:center;font-size:20px;font-weight:700;letter-spacing:.14em;color:var(--amber)">ABILITY</div>
+  <div style="position:absolute;right:335px;bottom:75px;width:130px;height:130px;border-radius:50%;
+    background:rgba(59,232,255,.16);border:2px solid rgba(59,232,255,.7);display:flex;align-items:center;
+    justify-content:center;font-size:20px;font-weight:700;letter-spacing:.14em;color:var(--cyan)">JUMP</div>
+</div>
+</div></body></html>
