@@ -1,0 +1,47 @@
+name: Probe CC0 assets
+
+# One-shot reconnaissance: lists what is actually inside the Kenney CC0 asset
+# repository so the real fetch can pin exact paths instead of guessing at them.
+# Safe to delete once the asset list in godot/assets.txt is settled.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Sparse-clone the asset index
+        run: |
+          set -euo pipefail
+          # Blobless + sparse: fetches the tree listing without any file contents.
+          git clone --filter=blob:none --no-checkout --depth 1 \
+            https://github.com/KenneyNL/Assets.git kenney
+          cd kenney
+          git sparse-checkout init --cone
+
+          echo "## Top level" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          git ls-tree --name-only HEAD | head -100 >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+          echo "## Packs that look relevant" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          git ls-tree --name-only HEAD \
+            | grep -Ei 'city|building|road|character|weapon|blaster|survival|tower|nature|prototype' \
+            >> "$GITHUB_STEP_SUMMARY" || echo "(no match)" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+          echo "## Inside the first matching packs" >> "$GITHUB_STEP_SUMMARY"
+          for pack in $(git ls-tree --name-only HEAD | grep -Ei 'city kit|characters|blaster' | head -6); do
+            echo "### $pack" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            git ls-tree -r --name-only HEAD "$pack" | head -40 >> "$GITHUB_STEP_SUMMARY"
+            echo "..." >> "$GITHUB_STEP_SUMMARY"
+            git ls-tree -r --name-only HEAD "$pack" | wc -l >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          done
+
+          echo "## Total entries" >> "$GITHUB_STEP_SUMMARY"
+          git ls-tree -r --name-only HEAD | wc -l >> "$GITHUB_STEP_SUMMARY"
