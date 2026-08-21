@@ -1,7 +1,7 @@
 name: Probe CC0 assets
 
-# Reconnaissance only: prints the Kenney mirror's pack folders and the model
-# files inside the 3D kits, so the real fetch can pin exact paths.
+# Reconnaissance only: which Kenney packs in the mirror contain 3D models.
+# Deliberately tiny output so it survives log tailing.
 
 on:
   workflow_dispatch:
@@ -11,38 +11,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - name: Clone the mirror's index
+      - name: List every pack that ships GLB models
         run: |
           set -eu
           git clone --filter=blob:none --no-checkout --depth 1 \
             https://github.com/ETdoFresh/kenney.nl.git mirror
           cd mirror
           git ls-tree -r --name-only HEAD > /tmp/all.txt
-          wc -l /tmp/all.txt
 
-      - name: Every 3D pack folder
-        run: |
-          set -eu
-          echo "=== folders holding 3D model files ==="
-          grep -iE '\.(glb|gltf|fbx|obj)$' /tmp/all.txt | cut -d/ -f1 | sort -u
-
-      - name: Contents of the kits we want
-        run: |
-          set -eu
-          for needle in citykit city-kit blaster blockycharacters blocky minichar weapon survival platformerkit naturekit; do
-            echo "=================================================="
-            echo "### matching folder names: $needle"
-            grep -i "^[^/]*$needle" /tmp/all.txt | cut -d/ -f1 | sort -u | head -10 || true
-
-            echo "--- sample model files"
-            grep -i "$needle" /tmp/all.txt | grep -iE '\.(glb|obj)$' | head -25 || true
-            echo "--- counts by extension"
-            grep -i "$needle" /tmp/all.txt | grep -oiE '\.(glb|gltf|fbx|obj|mtl|png)$' | sort | uniq -c || true
-          done
-
-      - name: One kit in full, to see the layout
-        run: |
-          set -eu
-          folder=$(grep -iE '\.(glb)$' /tmp/all.txt | cut -d/ -f1 | sort -u | head -1)
-          echo "### full listing of: $folder"
-          grep "^$folder/" /tmp/all.txt | head -60
+          echo "### packs containing .glb"
+          grep -iE '\.glb$' /tmp/all.txt | cut -d/ -f1 | sort | uniq -c | sort -rn
