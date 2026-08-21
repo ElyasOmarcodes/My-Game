@@ -8,11 +8,11 @@ namespace BattleOfAgents.Gameplay
     {
         Transform _camera;
 
-        public static NameTag Attach(Transform parent, string label, Color color)
+        public static NameTag Attach(Transform parent, string label, Color color, float height = 2.15f)
         {
             var go = new GameObject("NameTag", typeof(Canvas));
             go.transform.SetParent(parent, false);
-            go.transform.localPosition = new Vector3(0f, 2.15f, 0f);
+            go.transform.localPosition = new Vector3(0f, height, 0f);
 
             var canvas = go.GetComponent<Canvas>();
             canvas.renderMode = RenderMode.WorldSpace;

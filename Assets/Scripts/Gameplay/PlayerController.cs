@@ -1,4 +1,5 @@
 using BattleOfAgents.Core;
+using BattleOfAgents.Gameplay.World;
 using BattleOfAgents.Visual;
 using UnityEngine;
 
@@ -237,10 +238,10 @@ namespace BattleOfAgents.Gameplay
             match.Health = match.MaxHealth;
             match.Shield = 50f;
 
-            var arena = FindObjectOfType<ArenaBuilder>();
-            if (arena != null)
+            var city = FindObjectOfType<CityBuilder>();
+            if (city != null)
             {
-                var spawn = arena.PickSpawn(Team, Random.Range(0, 4));
+                var spawn = city.PickSpawn(Team, Random.Range(0, 64));
                 _controller.enabled = false;
                 transform.position = spawn.position;
                 transform.rotation = spawn.rotation;

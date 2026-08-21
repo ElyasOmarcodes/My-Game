@@ -1,5 +1,6 @@
 using BattleOfAgents.Core;
 using BattleOfAgents.Net;
+using BattleOfAgents.Gameplay.World;
 using BattleOfAgents.UI;
 using UnityEngine;
 
@@ -12,7 +13,7 @@ namespace BattleOfAgents.Gameplay
     {
         public static MatchController Instance { get; private set; }
 
-        ArenaBuilder _arena;
+        CityBuilder _city;
         PlayerController _local;
         MatchState _state;
 
@@ -49,12 +50,12 @@ namespace BattleOfAgents.Gameplay
                 ? session.RoomPlayers.ToArray()
                 : new[] { session.Local };
 
-            var arenaGo = new GameObject("Arena");
-            _arena = arenaGo.AddComponent<ArenaBuilder>();
-            _arena.Build(seed, mapName);
+            var cityGo = new GameObject("City");
+            _city = cityGo.AddComponent<CityBuilder>();
+            _city.Build(seed, mapName);
 
             var index = System.Array.FindIndex(roster, p => p.PlayerId == session.Local.PlayerId);
-            var spawn = _arena.PickSpawn(session.Local.Team, Mathf.Max(0, index));
+            var spawn = _city.PickSpawn(session.Local.Team, Mathf.Max(0, index));
 
             _local = PlayerController.Spawn(AgentCatalog.Get(session.Local.AgentId),
                 session.Local.Team, spawn, session.Local.DisplayName);
@@ -68,7 +69,7 @@ namespace BattleOfAgents.Gameplay
                 ? session.CurrentRoom.HostAddress
                 : LanUtility.LocalIPv4();
 
-            sync.Begin(LobbyService.Instance.IsHost, hostAddress, _local, roster, arenaGo.transform);
+            sync.Begin(LobbyService.Instance.IsHost, hostAddress, _local, roster, cityGo.transform);
 
             AppRouter.Instance.Go(ScreenId.Hud, false);
             Debug.Log("[Match] " + mapName + " · " + mode + " · seed " + seed +
@@ -81,10 +82,10 @@ namespace BattleOfAgents.Gameplay
             if (sync != null) sync.Stop();
 
             if (_local != null) Destroy(_local.gameObject);
-            if (_arena != null) Destroy(_arena.gameObject);
+            if (_city != null) Destroy(_city.gameObject);
 
             _local = null;
-            _arena = null;
+            _city = null;
             Time.timeScale = 1f;
         }
     }
