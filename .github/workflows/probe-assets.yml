@@ -1,8 +1,8 @@
 name: Probe CC0 assets
 
-# Reconnaissance for the CC0 model packs. The sandbox this project is developed
-# in cannot reach anything outside its own repository, so the exact download
-# URLs have to be discovered on a runner and pinned afterwards.
+# Reconnaissance for the CC0 model packs: lists the model files inside the
+# candidate repositories and prints their licence text, so the build can pin
+# exact paths and the credits file can name the right authors.
 
 on:
   workflow_dispatch:
@@ -12,59 +12,42 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Which hosts answer at all
+      - name: Inspect candidate packs
         run: |
-          {
-            echo "## Reachability"
-            echo '```'
-            for host in kenney.nl github.com api.github.com poly.pizza \
-                        opengameart.org quaternius.com kaylousberg.itch.io; do
-              code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "https://$host/" || echo FAIL)
-              echo "$host -> $code"
-            done
-            echo '```'
-          } | tee -a "$GITHUB_STEP_SUMMARY"
+          repos=(
+            "KayKit-Game-Assets/KayKit-City-Builder-Bits-1.0"
+            "KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0"
+            "sketchpunklabs/kaykit_char"
+            "Malcolmnixon/Quaternius-Modular-Scifi-Pack"
+            "BoQsc/cc0-guns-explosives-pack-glb"
+            "KenneyNL/KayKit-Hexagons"
+          )
 
-      - name: Kenney's GitHub account
+          for repo in "${repos[@]}"; do
+            echo "=============================================================="
+            echo "REPO: $repo"
+
+            meta=$(curl -sS --max-time 30 "https://api.github.com/repos/$repo")
+            branch=$(echo "$meta" | jq -r '.default_branch // "main"')
+            echo "  default branch: $branch   size: $(echo "$meta" | jq -r '.size') KB"
+            echo "  licence field:  $(echo "$meta" | jq -r '.license.spdx_id // "none"')"
+
+            echo "  --- licence file (first 6 lines)"
+            curl -sS --max-time 30 "https://api.github.com/repos/$repo/license" \
+              | jq -r '.content // ""' | base64 -d 2>/dev/null | head -6 | sed 's/^/    /' \
+              || echo "    (no licence file)"
+
+            echo "  --- model files"
+            curl -sS --max-time 60 "https://api.github.com/repos/$repo/git/trees/$branch?recursive=1" \
+              | jq -r '.tree[]? | select(.path | test("\\.(glb|gltf|fbx|obj)$"; "i")) | "    \(.path)  \(.size)"' \
+              | head -45
+            echo "  --- model file count by type"
+            curl -sS --max-time 60 "https://api.github.com/repos/$repo/git/trees/$branch?recursive=1" \
+              | jq -r '.tree[]? | .path' | grep -oiE '\.(glb|gltf|fbx|obj|png)$' | sort | uniq -c | sed 's/^/    /'
+          done
+
+      - name: Godot release assets available
         run: |
-          {
-            echo "## github.com/KenneyNL repositories"
-            echo '```'
-            curl -sS --max-time 30 'https://api.github.com/users/KenneyNL/repos?per_page=100' \
-              | jq -r '.[]? | "\(.full_name)  (\(.size) KB)"' | head -60 || echo "(query failed)"
-            echo '```'
-
-            echo "## Search: kenney assets"
-            echo '```'
-            curl -sS --max-time 30 'https://api.github.com/search/repositories?q=kenney+assets&per_page=15' \
-              | jq -r '.items[]? | "\(.full_name)  \(.size) KB  \(.description // "")"' || echo "(query failed)"
-            echo '```'
-          } | tee -a "$GITHUB_STEP_SUMMARY"
-
-      - name: Kenney asset pages and their download links
-        run: |
-          {
-            echo "## kenney.nl download links"
-            echo '```'
-            for slug in city-kit-commercial city-kit-suburban city-kit-roads \
-                        blaster-kit blocky-characters mini-characters-1 \
-                        weapon-pack survival-kit; do
-              echo "--- $slug"
-              curl -sSL --max-time 30 "https://kenney.nl/assets/$slug" \
-                | grep -oE 'href="[^"]*\.zip"' | sort -u | head -5 || echo "  (no zip link found)"
-            done
-            echo '```'
-          } | tee -a "$GITHUB_STEP_SUMMARY"
-
-      - name: Other CC0 sources worth pinning
-        run: |
-          {
-            echo "## Kay Lousberg / Quaternius style kits on GitHub"
-            echo '```'
-            for q in "kaykit" "quaternius" "cc0 3d models glb"; do
-              echo "--- search: $q"
-              curl -sS --max-time 30 "https://api.github.com/search/repositories?q=$(echo "$q" | tr ' ' '+')&per_page=8" \
-                | jq -r '.items[]? | "\(.full_name)  \(.size) KB  \(.license.spdx_id // "no-license")"' || true
-            done
-            echo '```'
-          } | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "--- godot 4.3-stable release files"
+          curl -sS --max-time 30 "https://api.github.com/repos/godotengine/godot/releases/tags/4.3-stable" \
+            | jq -r '.assets[]? | "\(.name)  \(.size)"' | grep -Ei 'linux|template' | head -20
