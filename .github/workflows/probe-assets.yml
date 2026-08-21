@@ -23,7 +23,7 @@ jobs:
               echo "$host -> $code"
             done
             echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Kenney's GitHub account
         run: |
@@ -39,7 +39,7 @@ jobs:
             curl -sS --max-time 30 'https://api.github.com/search/repositories?q=kenney+assets&per_page=15' \
               | jq -r '.items[]? | "\(.full_name)  \(.size) KB  \(.description // "")"' || echo "(query failed)"
             echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Kenney asset pages and their download links
         run: |
@@ -54,7 +54,7 @@ jobs:
                 | grep -oE 'href="[^"]*\.zip"' | sort -u | head -5 || echo "  (no zip link found)"
             done
             echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Other CC0 sources worth pinning
         run: |
@@ -67,4 +67,4 @@ jobs:
                 | jq -r '.items[]? | "\(.full_name)  \(.size) KB  \(.license.spdx_id // "no-license")"' || true
             done
             echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
