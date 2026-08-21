@@ -8,9 +8,9 @@ extends Node3D
 ## two players standing in different worlds. When no kit was fetched the same
 ## layout is built from primitives instead, which keeps the project runnable.
 
-const BLOCKS := 5
-const BLOCK_SIZE := 36.0
-const ROAD_WIDTH := 12.0
+const BLOCKS := 7
+const BLOCK_SIZE := 14.0
+const ROAD_WIDTH := 6.0
 const TILE := BLOCK_SIZE + ROAD_WIDTH
 
 var spawns: Array[Transform3D] = []
@@ -116,8 +116,8 @@ func _build_block(gx: int, gz: int) -> void:
 
 	for i in 3:
 		var offset := Vector3(
-			_rng.randf_range(-BLOCK_SIZE * 0.45, BLOCK_SIZE * 0.45), 0.0,
-			_rng.randf_range(-BLOCK_SIZE * 0.45, BLOCK_SIZE * 0.45))
+			_rng.randf_range(-BLOCK_SIZE * 0.42, BLOCK_SIZE * 0.42), 0.0,
+			_rng.randf_range(-BLOCK_SIZE * 0.42, BLOCK_SIZE * 0.42))
 		_place_prop(["box", "trash", "bench", "barrier"][_rng.randi() % 4],
 			centre + offset, _rng.randf() * 360.0)
 
@@ -144,11 +144,11 @@ func _build_park(centre: Vector3) -> void:
 func _place_building(position: Vector3, yaw: float) -> void:
 	var scene: PackedScene = _library.random("buildings") if _library else null
 	if scene:
-		_instance(scene, position, yaw, true)
+		_instance(scene, position, yaw, true, BLOCK_SIZE * 0.42)
 	else:
-		var height := _rng.randf_range(6.0, 22.0)
+		var height := _rng.randf_range(3.0, 7.0)
 		_primitive_block(position, Vector3(
-			_rng.randf_range(8.0, 14.0), height, _rng.randf_range(8.0, 14.0)),
+			_rng.randf_range(4.0, 6.0), height, _rng.randf_range(4.0, 6.0)),
 			Color(0.14, 0.15, 0.18), true)
 	_placed += 1
 
@@ -161,17 +161,18 @@ func _place_prop(hint: String, position: Vector3, yaw: float) -> void:
 	if scene:
 		_instance(scene, position, yaw, false)
 	elif hint == "tree":
-		_primitive_block(position, Vector3(0.5, 4.0, 0.5), Color(0.10, 0.08, 0.06), false)
-		_primitive_block(position + Vector3(0, 3.4, 0), Vector3(3.0, 2.4, 3.0),
+		_primitive_block(position, Vector3(0.3, 2.4, 0.3), Color(0.10, 0.08, 0.06), false)
+		_primitive_block(position + Vector3(0, 2.0, 0), Vector3(1.8, 1.4, 1.8),
 			Color(0.09, 0.17, 0.10), false)
 	elif hint == "streetlight":
-		_primitive_block(position + Vector3(0, 3.5, 0), Vector3(0.2, 7.0, 0.2),
+		_primitive_block(position + Vector3(0, 1.8, 0), Vector3(0.12, 3.6, 0.12),
 			Color(0.13, 0.14, 0.17), false)
 	_placed += 1
 
 ## Instances a kit piece and, when it should block movement, wraps it in a body
 ## sized to its own bounds — the kits ship visuals only, no collision.
-func _instance(scene: PackedScene, position: Vector3, yaw: float, solid: bool) -> void:
+func _instance(scene: PackedScene, position: Vector3, yaw: float, solid: bool,
+		fit_width := 0.0) -> void:
 	var node: Node = scene.instantiate()
 	if not (node is Node3D):
 		return
@@ -181,10 +182,16 @@ func _instance(scene: PackedScene, position: Vector3, yaw: float, solid: bool) -
 	model.rotation.y = deg_to_rad(yaw)
 	add_child(model)
 
+	var bounds := _visual_bounds(model)
+
+	# Kit pieces vary in size; nudge each one towards the lot it stands on so a
+	# cottage and a townhouse still read as the same town.
+	if fit_width > 0.0 and bounds.size.x > 0.001:
+		var largest := maxf(bounds.size.x, bounds.size.z)
+		model.scale = Vector3.ONE * clampf(fit_width / largest, 0.5, 3.5)
+
 	if not solid:
 		return
-
-	var bounds := _visual_bounds(model)
 	if bounds.size == Vector3.ZERO:
 		return
 

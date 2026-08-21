@@ -79,18 +79,24 @@ func _run() -> void:
 	var span := _city.span()
 
 	await _shot("godot-town-aerial",
-		Vector3(-span * 0.55, span * 0.42, -span * 0.55), Vector3(0, 4, 0), 48.0)
+		Vector3(-span * 0.42, span * 0.34, -span * 0.42), Vector3(0, 1.5, 0), 50.0)
 
+	# Stand on a road and look down it, at head height.
+	var road_x := -span * 0.5 + CityBuilder.ROAD_WIDTH * 0.5 + CityBuilder.TILE * 3.0
 	await _shot("godot-town-street",
-		Vector3(-CityBuilder.TILE * 1.5, 2.2, -span * 0.32),
-		Vector3(-CityBuilder.TILE * 1.5, 5.0, span * 0.2), 66.0)
+		Vector3(road_x, 1.7, -span * 0.34),
+		Vector3(road_x, 2.6, span * 0.3), 70.0)
+
+	await _shot("godot-town-corner",
+		Vector3(road_x - CityBuilder.TILE * 0.5, 3.4, -CityBuilder.TILE * 1.2),
+		Vector3(road_x + CityBuilder.TILE * 0.8, 1.2, CityBuilder.TILE * 0.6), 62.0)
 
 	_spawn_lineup()
 	await _shot("godot-agents", Vector3(0.4, 1.55, 6.4), Vector3(0, 1.0, 0), 42.0)
 
 func _spawn_lineup() -> void:
 	# A clean patch of street to stand the roster on.
-	var stage := Vector3(0, 40, 0)
+	var stage := Vector3(0, 60, 0)
 	_camera.position += stage
 
 	var floor_mesh := MeshInstance3D.new()
