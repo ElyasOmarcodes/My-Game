@@ -22,6 +22,7 @@ boot_splash/show_image=false
 
 Session="*res://scripts/game/session.gd"
 Lan="*res://scripts/net/lan_discovery.gd"
+NetGame="*res://scripts/net/net_game.gd"
 
 [display]
 

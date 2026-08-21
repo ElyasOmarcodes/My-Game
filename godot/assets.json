@@ -1,0 +1,25 @@
+{
+  "_comment": "Which CC0 kits the build fetches. Swap these to change the art without touching code — the loader matches models by category and filename hint.",
+  "sources": [
+    {
+      "name": "Kenney kits",
+      "url": "https://github.com/ETdoFresh/kenney.nl.git",
+      "folders": ["fantasy-town-kit-1.0", "kenney_natureKit_2.1", "carkit_v1.4"],
+      "author": "Kenney",
+      "licence": "CC0-1.0"
+    },
+    {
+      "name": "KayKit Adventurers",
+      "url": "https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0.git",
+      "folders": ["addons"],
+      "author": "Kay Lousberg",
+      "licence": "CC0-1.0"
+    }
+  ],
+  "categories": {
+    "buildings": "Placed on the blocks between roads",
+    "props": "Scattered cover, trees, barrels, lanterns",
+    "characters": "Rigged agent bodies, matched by AgentCatalog.model_hint",
+    "weapons": "Held models, matched by weapon model_hint"
+  }
+}

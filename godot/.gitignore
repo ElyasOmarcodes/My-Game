@@ -1,0 +1,7 @@
+# Godot's import cache — regenerated from the sources on every build.
+.godot/
+export_credentials.cfg
+
+# CC0 model kits, fetched by tools/fetch_assets.sh rather than committed.
+assets/*
+!assets/.gitkeep

@@ -1,0 +1,195 @@
+name: Godot APK
+
+# Builds the real Android APK with Godot. No engine licence exists to block
+# this — Godot is MIT — so it runs on every push with no secrets at all.
+#
+# The CC0 art kits are fetched here rather than committed: they are megabytes of
+# binary that would weigh down every clone, and their sources are pinned in
+# godot/assets.json.
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish_release:
+        description: "Also publish the APK as a GitHub release"
+        type: boolean
+        default: false
+  push:
+    branches: [ "claude/android-multiplayer-game-st4h00", "main" ]
+    paths-ignore: [ "docs/**", "**/*.md" ]
+
+concurrency:
+  group: godot-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GODOT_VERSION: 4.3
+  GODOT_RELEASE: 4.3-stable
+  BOA_VERSION: 0.2.0
+
+jobs:
+  build:
+    name: Export APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # The editor is 50 MB and the export templates are ~1 GB, so both are
+      # cached; only the first run on a new Godot version pays for the download.
+      - name: Cache Godot editor and templates
+        id: godot-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/godot-bin
+            ~/.local/share/godot/export_templates
+          key: godot-${{ env.GODOT_RELEASE }}-v2
+
+      - name: Install Godot
+        if: steps.godot-cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          base="https://github.com/godotengine/godot/releases/download/${GODOT_RELEASE}"
+          mkdir -p ~/godot-bin ~/.local/share/godot/export_templates
+
+          curl -sSL -o /tmp/godot.zip "$base/Godot_v${GODOT_RELEASE}_linux.x86_64.zip"
+          unzip -q /tmp/godot.zip -d ~/godot-bin
+          mv ~/godot-bin/Godot_v${GODOT_RELEASE}_linux.x86_64 ~/godot-bin/godot
+          chmod +x ~/godot-bin/godot
+
+          curl -sSL -o /tmp/templates.tpz "$base/Godot_v${GODOT_RELEASE}_export_templates.tpz"
+          unzip -q /tmp/templates.tpz -d /tmp/templates
+          mv /tmp/templates/templates ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
+
+      - name: Point Godot at the Android SDK and a debug key
+        run: |
+          set -euo pipefail
+          echo "$HOME/godot-bin" >> "$GITHUB_PATH"
+
+          # Godot signs debug exports itself, but it needs a keystore to sign with.
+          keytool -genkeypair -v -keystore "$HOME/debug.keystore" \
+            -storepass android -keypass android -alias androiddebugkey \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US" 2>/dev/null
+
+          # Written line by line: a YAML-indented heredoc would leave leading
+          # spaces in the .tres, which Godot refuses to parse.
+          mkdir -p ~/.config/godot
+          {
+            echo '[gd_resource type="EditorSettings" format=3]'
+            echo ''
+            echo '[resource]'
+            echo "export/android/android_sdk_path = \"$ANDROID_HOME\""
+            echo "export/android/debug_keystore = \"$HOME/debug.keystore\""
+            echo 'export/android/debug_keystore_user = "androiddebugkey"'
+            echo 'export/android/debug_keystore_pass = "android"'
+          } > ~/.config/godot/editor_settings-4.tres
+
+          # The settings filename has moved between point releases; cover both.
+          cp ~/.config/godot/editor_settings-4.tres \
+             ~/.config/godot/editor_settings-${GODOT_VERSION}.tres
+          cat ~/.config/godot/editor_settings-4.tres
+
+      - name: Fetch the CC0 art kits
+        run: tools/fetch_assets.sh
+
+      - name: Import the project
+        run: |
+          set -euo pipefail
+          mkdir -p build
+          # Importing every model builds the .godot cache. Godot often exits
+          # non-zero even when this succeeds, so the cache itself is the check.
+          godot --headless --path godot --import 2>&1 | tail -50 || true
+
+          if [ ! -d godot/.godot/imported ]; then
+            echo "--- retrying through the editor"
+            godot --headless --editor --path godot --quit 2>&1 | tail -50 || true
+          fi
+          test -d godot/.godot/imported || { echo "::error::import produced no cache"; exit 1; }
+          echo "imported $(find godot/.godot/imported -type f | wc -l) files"
+
+      - name: Export the APK
+        run: |
+          set -euo pipefail
+          godot --headless --path godot \
+            --export-debug "Android" "../build/BattleOfAgents.apk" 2>&1 | tail -40
+          ls -la build
+
+      - name: Verify the APK
+        id: apk
+        run: |
+          set -euo pipefail
+          APK=build/BattleOfAgents.apk
+          test -f "$APK" || { echo "::error::no APK produced"; exit 1; }
+          echo "path=$APK" >> "$GITHUB_OUTPUT"
+          echo "bytes=$(stat -c%s "$APK")" >> "$GITHUB_OUTPUT"
+
+          BT="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
+          "$BT/apksigner" verify --print-certs "$APK"
+
+      # A signed APK is already a zip, so re-deflating it would break the signing
+      # block. It is wrapped in a maximally compressed archive instead.
+      - name: Package a max-compressed zip
+        id: zip
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq && sudo apt-get install -y -qq p7zip-full
+          NAME="BattleOfAgents-${{ env.BOA_VERSION }}-${{ github.run_number }}"
+          mkdir -p dist
+          cp "${{ steps.apk.outputs.path }}" "dist/$NAME.apk"
+          cd dist
+          7z a -tzip -mx=9 -mfb=258 -mpass=15 -mmt=on "$NAME.zip" "$NAME.apk"
+          echo "zip_bytes=$(stat -c%s "$NAME.zip")" >> "$GITHUB_OUTPUT"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Size report
+        run: |
+          apk=${{ steps.apk.outputs.bytes }}
+          zip=${{ steps.zip.outputs.zip_bytes }}
+          {
+            echo "### Battle of Agents — Godot build ${{ github.run_number }}"
+            echo ""
+            echo "| artefact | size |"
+            echo "| --- | ---: |"
+            printf "| APK | %.2f MB |\n" "$(echo "$apk/1048576" | bc -l)"
+            printf "| ZIP (7z -mx=9) | %.2f MB |\n" "$(echo "$zip/1048576" | bc -l)"
+            echo ""
+            echo "Godot ${{ env.GODOT_RELEASE }} · arm64-v8a · debug-signed."
+            echo "Art: CC0 kits by Kenney and Kay Lousberg, fetched at build time."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.zip.outputs.name }}
+          path: dist/*
+          compression-level: 0
+          retention-days: 60
+
+      - name: Publish release
+        if: inputs.publish_release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          tag_name: godot-v${{ env.BOA_VERSION }}.${{ github.run_number }}
+          name: Battle of Agents — Godot ${{ env.BOA_VERSION }}.${{ github.run_number }}
+          body: |
+            Built with Godot ${{ env.GODOT_RELEASE }}. No engine licence needed.
+
+            **Install:** download the `.apk`, open it, allow "install unknown
+            apps" when asked. Signed with the Android debug key.
+
+            - Free-roam town built from CC0 kits by Kenney and Kay Lousberg
+            - Four rigged agents with their own weapons
+            - Wi-Fi squads: **Host a squad**, and other phones on the same
+              network see it in the list automatically (UDP 47777)
