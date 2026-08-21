@@ -31,7 +31,7 @@ func _ready() -> void:
 
 func _stable_id() -> String:
 	# Reused across launches so a reconnecting phone keeps its slot.
-	var stored := _prefs().get_value("identity", "player_id", "")
+	var stored: String = _prefs().get_value("identity", "player_id", "")
 	if stored != "":
 		return stored
 	var fresh := "%08x%04x" % [Time.get_unix_time_from_system(), randi() % 65536]
@@ -39,7 +39,7 @@ func _stable_id() -> String:
 	return fresh
 
 func _load_name() -> String:
-	var stored := _prefs().get_value("identity", "name", "")
+	var stored: String = _prefs().get_value("identity", "name", "")
 	if stored != "":
 		return stored
 	var generated := "Agent-%03d" % (randi() % 900 + 100)

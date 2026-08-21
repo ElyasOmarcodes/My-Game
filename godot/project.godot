@@ -33,6 +33,17 @@ window/stretch/aspect="expand"
 window/handheld/orientation=2
 window/vsync/vsync_mode=0
 
+[debug]
+
+; Inference from a Variant is an error by default in 4.3. Kept as a warning so a
+; single untyped call cannot fail the whole build; the headless smoke test in CI
+; is what actually guards startup.
+gdscript/warnings/inference_on_variant=1
+gdscript/warnings/unsafe_property_access=1
+gdscript/warnings/unsafe_method_access=1
+gdscript/warnings/unsafe_cast=1
+gdscript/warnings/untyped_declaration=0
+
 [layer_names]
 
 3d_physics/layer_1="world"

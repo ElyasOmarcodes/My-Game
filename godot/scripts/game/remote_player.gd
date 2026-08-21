@@ -33,7 +33,7 @@ func _ready() -> void:
 			scene = library.pick("characters", AgentCatalog.agent_index(agent["id"]))
 
 	if scene:
-		var instance := scene.instantiate()
+		var instance: Node = scene.instantiate()
 		add_child(instance)
 		_animation = _find_animation_player(instance)
 	else:

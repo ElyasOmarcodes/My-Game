@@ -172,7 +172,7 @@ func _place_prop(hint: String, position: Vector3, yaw: float) -> void:
 ## Instances a kit piece and, when it should block movement, wraps it in a body
 ## sized to its own bounds — the kits ship visuals only, no collision.
 func _instance(scene: PackedScene, position: Vector3, yaw: float, solid: bool) -> void:
-	var node := scene.instantiate()
+	var node: Node = scene.instantiate()
 	if not (node is Node3D):
 		return
 
