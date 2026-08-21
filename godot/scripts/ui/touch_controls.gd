@@ -87,11 +87,11 @@ func _button(label: String, radius: float, accent: Color) -> Control:
 	return node
 
 func _button_at(position: Vector2) -> String:
-	for name in _buttons:
-		var node: Control = _buttons[name]
+	for button_name in _buttons:
+		var node: Control = _buttons[button_name]
 		var centre := node.position + node.size * 0.5
 		if position.distance_to(centre) <= node.size.x * 0.5:
-			return name
+			return button_name
 	return ""
 
 func _input(event: InputEvent) -> void:
@@ -162,7 +162,17 @@ func consume_look() -> Vector2:
 	look = Vector2.ZERO
 	return delta
 
-## Keyboard falls back in for desktop testing.
+## Keyboard falls back in for desktop testing. Keys are read directly rather
+## than through the input map: a hand-written map in project.godot is one typo
+## away from breaking the whole project file.
 func move_axis() -> Vector2:
-	var keys := Input.get_vector("move_left", "move_right", "move_back", "move_forward")
+	var keys := Vector2(
+		float(Input.is_key_pressed(KEY_D)) - float(Input.is_key_pressed(KEY_A)),
+		float(Input.is_key_pressed(KEY_W)) - float(Input.is_key_pressed(KEY_S)))
 	return keys if keys.length_squared() > 0.01 else move
+
+func jump_held() -> bool:
+	return Input.is_key_pressed(KEY_SPACE)
+
+func fire_held() -> bool:
+	return Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)

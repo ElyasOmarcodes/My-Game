@@ -167,12 +167,7 @@ func _move(position: Vector3, yaw: float) -> void:
 
 ## Called by the local weapon when its ray lands on someone. The host has the
 ## final say; a client only ever asks.
-static func report_hit(victim_id: String, damage: float) -> void:
-	var instance := Engine.get_main_loop().root.get_node_or_null("/root/NetGame")
-	if instance:
-		instance._request_damage(victim_id, damage)
-
-func _request_damage(victim_id: String, damage: float) -> void:
+func report_hit(victim_id: String, damage: float) -> void:
 	if not connected:
 		# Solo drill: no host to ask, so resolve it here.
 		_apply_damage(victim_id, damage, Session.player_id)

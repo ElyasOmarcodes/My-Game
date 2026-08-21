@@ -173,7 +173,7 @@ func _place_prop(hint: String, position: Vector3, yaw: float) -> void:
 ## sized to its own bounds — the kits ship visuals only, no collision.
 func _instance(scene: PackedScene, position: Vector3, yaw: float, solid: bool) -> void:
 	var node := scene.instantiate()
-	if node is not Node3D:
+	if not (node is Node3D):
 		return
 
 	var model := node as Node3D

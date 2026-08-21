@@ -207,7 +207,7 @@ func _physics_process(delta: float) -> void:
 	_stride += planar * delta * 2.4
 	_drive_animation(planar)
 
-func _read_input(delta: float) -> void:
+func _read_input(_delta: float) -> void:
 	if _controls == null:
 		return
 
@@ -225,9 +225,9 @@ func _read_input(delta: float) -> void:
 	velocity.x = direction.x * speed
 	velocity.z = direction.z * speed
 
-	if Input.is_action_just_pressed("jump"):
+	if _controls.jump_held():
 		_try_jump()
-	if get_meta("firing", false) or Input.is_action_pressed("fire"):
+	if get_meta("firing", false) or _controls.fire_held():
 		fire()
 
 func _try_jump() -> void:

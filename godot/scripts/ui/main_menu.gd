@@ -41,8 +41,9 @@ func _ready() -> void:
 	_heading(left, "Wi-Fi squad combat · 2–8 agents", 15, TEXT_MID)
 	_spacer(left, 18)
 
-	_button(left, "Host a squad", CYAN, func():
-		host_requested.emit("%s's squad" % Session.display_name))
+	var on_host := func() -> void:
+		host_requested.emit("%s's squad" % Session.display_name)
+	_button(left, "Host a squad", CYAN, on_host)
 	_button(left, "Solo drill", AMBER, func(): solo_requested.emit())
 	_spacer(left, 12)
 	_heading(left, "%s · %s" % [Session.display_name, Lan.local_ip()], 13, TEXT_LOW)
