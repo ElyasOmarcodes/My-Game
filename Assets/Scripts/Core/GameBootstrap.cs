@@ -1,4 +1,5 @@
 using System;
+using BattleOfAgents.Gameplay;
 using BattleOfAgents.Net;
 using BattleOfAgents.Visual;
 using UnityEngine;
@@ -29,6 +30,7 @@ namespace BattleOfAgents.Core
             host.AddComponent<CinematicRig>();
             host.AddComponent<LanDiscovery>();
             host.AddComponent<LobbyService>();
+            host.AddComponent<MatchController>();
 
             var router = host.AddComponent<AppRouter>();
             router.Boot(Session);

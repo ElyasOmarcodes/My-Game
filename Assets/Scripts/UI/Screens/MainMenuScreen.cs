@@ -37,6 +37,8 @@ namespace BattleOfAgents.UI.Screens
                 () => Router.Go(ScreenId.LanBrowser), 88f, Theme.Amber);
             UIKit.GhostButton(left.transform, "Agents & loadout",
                 () => Router.Go(ScreenId.AgentSelect), 72f);
+            // Lets one person check the build without a second phone on the network.
+            UIKit.GhostButton(left.transform, "Solo drill", StartSoloDrill, 72f);
             UIKit.GhostButton(left.transform, "Settings",
                 () => Router.Go(ScreenId.Settings), 72f);
 
@@ -85,6 +87,13 @@ namespace BattleOfAgents.UI.Screens
             UIKit.Flex(card.transform);
             UIKit.GhostButton(card.transform, "Change agent",
                 () => Router.Go(ScreenId.AgentSelect), 64f);
+        }
+
+        void StartSoloDrill()
+        {
+            Session.Local.Team = Team.Alpha;
+            Gameplay.MatchController.Instance.Begin(Session.SelectedMap,
+                Session.SelectedMode, UnityEngine.Random.Range(1, int.MaxValue));
         }
 
         static string NetworkStatusLine()

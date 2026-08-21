@@ -50,6 +50,7 @@ SCREENS["02-main-menu"] = ("Main menu", f"""
     <div class="btn clip">Host a squad</div>
     <div class="btn amber clip">Join over Wi-Fi</div>
     <div class="btn ghost clip">Agents &amp; loadout</div>
+    <div class="btn ghost clip">Solo drill</div>
     <div class="btn ghost clip">Settings</div>
     <div class="grow"></div>
     <div class="low" style="font-size:20px">v0.1.0 &nbsp;·&nbsp; no internet required</div>

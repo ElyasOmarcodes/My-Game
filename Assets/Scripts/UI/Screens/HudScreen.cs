@@ -11,9 +11,10 @@ namespace BattleOfAgents.UI.Screens
     {
         public override ScreenId Id { get { return ScreenId.Hud; } }
 
-        Text _clock, _scoreA, _scoreB, _health, _ammo, _streak;
+        Text _clock, _scoreA, _scoreB, _health, _ammo, _weaponName, _streak;
         Image _healthBar, _shieldBar, _abilityBar;
-        RectTransform _feed;
+        RectTransform _feed, _stickBase, _stickKnob;
+        readonly Rect[] _buttonRects = new Rect[3];
 
         protected override void Build()
         {
@@ -21,6 +22,7 @@ namespace BattleOfAgents.UI.Screens
 
             TopBar();
             Vitals();
+            Ammo();
             KillFeed();
             TouchControls();
             Crosshair();
@@ -94,6 +96,27 @@ namespace BattleOfAgents.UI.Screens
             _abilityBar = UIKit.Bar(col.transform, 0.4f, Theme.Amber, 6f);
         }
 
+        void Ammo()
+        {
+            var box = UIKit.Rect("Ammo", Root);
+            box.anchorMin = new Vector2(1f, 0f);
+            box.anchorMax = new Vector2(1f, 0f);
+            box.pivot = new Vector2(1f, 0f);
+            box.sizeDelta = new Vector2(360f, 100f);
+            box.anchoredPosition = new Vector2(-560f, 44f);
+
+            var col = UIKit.Column(box, 2f, null, "AmmoBody");
+            UIKit.Fill((RectTransform)col.transform);
+
+            _ammo = UIKit.Label(col.transform, "30 / 120", 46, Theme.TextHi,
+                FontStyle.Bold, TextAnchor.MiddleRight);
+            _ammo.gameObject.AddComponent<LayoutElement>().preferredHeight = 58f;
+
+            _weaponName = UIKit.Label(col.transform, "MK-7 CARBINE", 19, Theme.TextLow,
+                FontStyle.Bold, TextAnchor.MiddleRight);
+            _weaponName.gameObject.AddComponent<LayoutElement>().preferredHeight = 26f;
+        }
+
         void KillFeed()
         {
             var box = UIKit.Rect("KillFeed", Root);
@@ -113,7 +136,8 @@ namespace BattleOfAgents.UI.Screens
         void TouchControls()
         {
             var stick = UIKit.Panel(Root, Theme.WithAlpha(Theme.TextLow, 0.10f), "StickBase");
-            var srt = (RectTransform)stick.transform;
+            _stickBase = (RectTransform)stick.transform;
+            var srt = _stickBase;
             srt.anchorMin = new Vector2(0f, 0f);
             srt.anchorMax = new Vector2(0f, 0f);
             srt.pivot = new Vector2(0.5f, 0.5f);
@@ -121,16 +145,23 @@ namespace BattleOfAgents.UI.Screens
             srt.anchoredPosition = new Vector2(210f, 250f);
 
             var knob = UIKit.Panel(stick.transform, Theme.WithAlpha(Theme.Cyan, 0.35f), "StickKnob");
-            var krt = (RectTransform)knob.transform;
+            _stickKnob = (RectTransform)knob.transform;
+            var krt = _stickKnob;
             krt.sizeDelta = new Vector2(96f, 96f);
             krt.anchoredPosition = Vector2.zero;
 
-            ActionButton("FIRE", new Vector2(-180f, 190f), 200f, Theme.Danger);
-            ActionButton("ABILITY", new Vector2(-400f, 300f), 130f, Theme.Amber);
-            ActionButton("JUMP", new Vector2(-400f, 140f), 130f, Theme.Cyan);
+            _buttonRects[0] = ActionButton("FIRE", new Vector2(-180f, 190f), 200f, Theme.Danger);
+            _buttonRects[1] = ActionButton("ABILITY", new Vector2(-400f, 300f), 130f, Theme.Amber);
+            _buttonRects[2] = ActionButton("JUMP", new Vector2(-400f, 140f), 130f, Theme.Cyan);
+
+            // Hand the hit-boxes to the input layer so what the player taps is exactly
+            // what they see — no second set of hard-coded coordinates to drift.
+            var input = Gameplay.TouchInput.Instance;
+            if (input != null) input.RegisterButtons(_buttonRects[0], _buttonRects[1], _buttonRects[2]);
         }
 
-        void ActionButton(string caption, Vector2 anchoredPos, float size, Color color)
+        /// <returns>The button's rect in screen pixels, for hit-testing touches.</returns>
+        Rect ActionButton(string caption, Vector2 anchoredPos, float size, Color color)
         {
             var rt = UIKit.Rect("Action_" + caption, Root);
             rt.anchorMin = new Vector2(1f, 0f);
@@ -148,6 +179,11 @@ namespace BattleOfAgents.UI.Screens
             var label = UIKit.Label(rt, caption, size > 150f ? 26 : 20, color,
                 FontStyle.Bold, TextAnchor.MiddleCenter);
             UIKit.Fill((RectTransform)label.transform);
+
+            var scale = Screen.height / Theme.ReferenceResolution.y;
+            var centre = new Vector2(Screen.width + anchoredPos.x * scale, anchoredPos.y * scale);
+            var pixels = size * scale;
+            return new Rect(centre.x - pixels * 0.5f, centre.y - pixels * 0.5f, pixels, pixels);
         }
 
         void Crosshair()
@@ -192,7 +228,29 @@ namespace BattleOfAgents.UI.Screens
 
             _healthBar.color = m.Health / m.MaxHealth < 0.3f ? Theme.Danger : Theme.Success;
 
+            _ammo.text = m.AmmoInClip + " / " + m.AmmoReserve;
+            _ammo.color = m.AmmoInClip == 0 ? Theme.Danger : Theme.TextHi;
+
+            FollowStick();
+
             if (!m.IsRunning) Router.Go(ScreenId.Results, false);
+        }
+
+        /// <summary>Draw the movement stick where the thumb actually landed.</summary>
+        void FollowStick()
+        {
+            var input = Gameplay.TouchInput.Instance;
+            if (input == null || _stickBase == null) return;
+
+            if (!input.StickActive)
+            {
+                _stickKnob.anchoredPosition = Vector2.zero;
+                return;
+            }
+
+            var scale = Theme.ReferenceResolution.y / Screen.height;
+            _stickBase.anchoredPosition = input.StickOrigin * scale;
+            _stickKnob.anchoredPosition = (input.StickHandle - input.StickOrigin) * scale;
         }
 
         static void SetFill(Image bar, float t01)

@@ -13,7 +13,8 @@ namespace BattleOfAgents.Core
 
         // --- LAN networking -------------------------------------------------
         public const int DiscoveryPort    = 47777;       // UDP broadcast beacon
-        public const int GamePort         = 47778;       // UnityTransport / relay-free host
+        public const int GamePort         = 47778;       // TCP lobby control channel
+        public const int SyncPort         = 47779;       // UDP gameplay snapshots (20 Hz)
         public const float BeaconInterval = 1.0f;        // seconds between host beacons
         public const float BeaconTimeout  = 4.0f;        // drop a room after this silence
 
