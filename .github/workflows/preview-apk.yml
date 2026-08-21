@@ -8,6 +8,11 @@ name: Preview APK
 
 on:
   workflow_dispatch:
+    inputs:
+      publish_release:
+        description: "Also publish the APK as a GitHub release"
+        type: boolean
+        default: false
   push:
     branches: [ "claude/android-multiplayer-game-st4h00", "main" ]
     tags: [ "preview-v*" ]
@@ -107,11 +112,13 @@ jobs:
       # A release gives a direct .apk link, which is far easier to install from a
       # phone than an Actions artifact (those always download as a zip).
       - name: Publish release
-        if: startsWith(github.ref, 'refs/tags/preview-v')
+        if: startsWith(github.ref, 'refs/tags/preview-v') || inputs.publish_release
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*
-          name: Battle of Agents — preview ${{ github.ref_name }}
+          # On a manual run there is no tag, so the action creates one at this commit.
+          tag_name: preview-v${{ env.BOA_VERSION }}.${{ github.run_number }}
+          name: Battle of Agents — preview ${{ env.BOA_VERSION }}.${{ github.run_number }}
           body: |
             Playable preview build of the free-roam city.
 
