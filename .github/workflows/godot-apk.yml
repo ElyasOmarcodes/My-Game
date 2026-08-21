@@ -113,6 +113,15 @@ jobs:
             exit 1
           fi
 
+          # Buildings specifically: the city falls back to grey boxes without
+          # them, which is the exact failure that slipped through once already.
+          buildings=$(python3 -c "import json;d=json.load(open('godot/assets/manifest.json'));print(len(d['categories'].get('buildings',[])))")
+          echo "  buildings: $buildings"
+          if [ "$buildings" -lt 5 ]; then
+            echo "::error::only $buildings building models — the town kit was not classified"
+            exit 1
+          fi
+
       - name: Import the project
         run: |
           set -euo pipefail

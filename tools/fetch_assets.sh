@@ -71,22 +71,30 @@ find "$KAY" \( -iname '*.glb' -o -iname '*.gltf' \) -printf '%f\n' 2>/dev/null |
 echo
 
 # --- buildings and streets ----------------------------------------------------
-collect "$TOWN" buildings "building*.glb"
-collect "$TOWN" buildings "house*.glb"
-collect "$TOWN" buildings "tower*.glb"
-collect "$TOWN" buildings "market*.glb"
-collect "$TOWN" buildings "chimney*.glb" 0     # roof detail, not a building
+#
+# Classify by name rather than guess at patterns: the first attempt matched no
+# buildings at all and shipped a city of placeholder boxes. Anything that reads
+# as scenery goes to props; everything else in the town kit is a building.
 
-collect "$TOWN" props "barrel*.glb"
-collect "$TOWN" props "crate*.glb"
-collect "$TOWN" props "box*.glb"
-collect "$TOWN" props "bench*.glb"
-collect "$TOWN" props "lantern*.glb"
-collect "$TOWN" props "streetlight*.glb"
-collect "$TOWN" props "sign*.glb"
-collect "$TOWN" props "well*.glb"
-collect "$TOWN" props "fence*.glb" 12
-collect "$TOWN" props "cart*.glb"
+PROPS_PATTERN='barrel|crate|box|bench|lantern|lamp|sign|well|fence|cart|wagon'
+PROPS_PATTERN="$PROPS_PATTERN"'|chimney|door|window|stair|ladder|pot|plant|bush'
+PROPS_PATTERN="$PROPS_PATTERN"'|tree|rock|grass|campfire|barrier|pillar|column'
+PROPS_PATTERN="$PROPS_PATTERN"'|fountain|statue|banner|flag|awning|stall|crop|log'
+
+mkdir -p "$DEST/buildings" "$DEST/props"
+town_buildings=0
+town_props=0
+
+while IFS= read -r file; do
+  base="$(basename "$file" | tr '[:upper:]' '[:lower:]')"
+  if echo "$base" | grep -qE "$PROPS_PATTERN"; then
+    cp "$file" "$DEST/props/" 2>/dev/null && town_props=$((town_props + 1))
+  else
+    cp "$file" "$DEST/buildings/" 2>/dev/null && town_buildings=$((town_buildings + 1))
+  fi
+done < <(find "$TOWN" -type f -iname '*.glb' 2>/dev/null | sort)
+
+echo "    town kit split: $town_buildings buildings, $town_props props"
 
 NATURE="$WORK/kenney/kenney_natureKit_2.1"
 collect "$NATURE" props "tree*.glb" 14
@@ -158,5 +166,8 @@ Fetched at build time by `tools/fetch_assets.sh`; not committed to this
 repository. Which kits are used is declared in `godot/assets.json`.
 CREDITS
 
+echo
+echo "=== buildings chosen (first 40) ==="
+ls "$DEST/buildings" 2>/dev/null | head -40
 echo
 echo "Assets ready in $DEST"
