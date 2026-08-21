@@ -10,7 +10,7 @@ the same router discovers it automatically and joins.
 | Language | C# (no third-party runtime packages) |
 | Networking | UDP broadcast discovery + TCP lobby channel, host-authoritative |
 | Target | Android 7.0 (API 24) and up · ARM64 · IL2CPP |
-| Output | Single signed APK, wrapped in a max-compressed zip by CI |
+| Output | Single debug-signed APK, wrapped in a max-compressed zip by CI |
 
 ## Screens
 
@@ -67,17 +67,31 @@ Unity -batchmode -quit -projectPath . \
 ## Building in CI
 
 `.github/workflows/android-build.yml` builds on every push to the feature branch, and
-on demand from the Actions tab. It needs these repository secrets:
+on demand from the Actions tab.
+
+**The one thing it needs is a Unity licence.** Unity refuses to start in batch mode
+unactivated, so without it the build cannot run at all. Getting one is free and takes
+a couple of minutes, once:
+
+1. Actions ▸ **Unity licence request** ▸ *Run workflow*.
+2. Download the `Unity_alf` artifact from that run and unzip it.
+3. Upload the `.alf` at <https://license.unity3d.com/manual>, choose **Unity Personal**,
+   download the `.ulf`.
+4. Settings ▸ Secrets and variables ▸ Actions ▸ *New repository secret*:
+   `UNITY_LICENSE` = the entire contents of the `.ulf` file.
+
+Until that secret exists, the workflow reports "build skipped" with these steps in its
+summary instead of failing with Unity's cryptic `Missing Unity License File` error.
 
 | Secret | Required | What it is |
 | --- | --- | --- |
-| `UNITY_LICENSE` | yes | Contents of your `.ulf` personal licence file |
-| `UNITY_EMAIL` / `UNITY_PASSWORD` | yes | Unity account used to activate the licence |
-| `ANDROID_KEYSTORE_BASE64` | optional | `base64 -w0 release.keystore` — omit to sign with the debug key |
-| `ANDROID_KEYSTORE_PASS`, `ANDROID_KEYALIAS_NAME`, `ANDROID_KEYALIAS_PASS` | optional | Release signing credentials |
+| `UNITY_LICENSE` | yes | Contents of the `.ulf` personal licence file |
+| `UNITY_SERIAL` | alternative | Serial number instead, if you have Unity Plus/Pro |
+| `UNITY_EMAIL` / `UNITY_PASSWORD` | with serial | Unity account for serial activation |
 
-Without `UNITY_LICENSE` the build cannot start — Unity refuses to run head-lessly
-unactivated. Everything else has a working default.
+No keystore secrets: **the APK is signed with Unity's debug key**, so it installs on any
+phone with "install unknown apps" enabled. That is the right choice for sideloading and
+LAN testing — a Play Store upload would need a release key instead.
 
 ## Keeping the download small
 

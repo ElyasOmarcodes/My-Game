@@ -21,8 +21,46 @@ env:
   BOA_VERSION: 0.1.0
 
 jobs:
+  # Unity refuses to run head-lessly without an activated licence, and the error it
+  # prints ("Missing Unity License File") is easy to mistake for a project problem.
+  # This gate names the real cause up front and skips the build instead of failing it.
+  preflight:
+    name: Check Unity licence
+    runs-on: ubuntu-latest
+    outputs:
+      licensed: ${{ steps.check.outputs.licensed }}
+    steps:
+      - id: check
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+        run: |
+          if [ -n "$UNITY_LICENSE" ] || [ -n "$UNITY_SERIAL" ]; then
+            echo "licensed=true" >> "$GITHUB_OUTPUT"
+            echo "✅ Unity licence found — building." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "licensed=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "## ⏭️ Build skipped — no Unity licence"
+              echo ""
+              echo "Unity cannot start in batch mode without an activated licence."
+              echo "One-time setup:"
+              echo ""
+              echo "1. Actions ▸ **Unity licence request** ▸ Run workflow."
+              echo "2. Download the \`Unity_v2022.x.alf\` artifact from that run."
+              echo "3. Upload it at <https://license.unity3d.com/manual> and download the \`.ulf\`."
+              echo "4. Settings ▸ Secrets and variables ▸ Actions ▸ New secret:"
+              echo "   **\`UNITY_LICENSE\`** = the entire contents of the \`.ulf\` file."
+              echo ""
+              echo "Then re-run this workflow. Nothing else is needed — the APK is signed"
+              echo "with Unity's debug key, so no keystore secrets are required."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
   build:
     name: Build APK (IL2CPP · ARM64)
+    needs: preflight
+    if: needs.preflight.outputs.licensed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 90
 
@@ -30,6 +68,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           lfs: false
+          fetch-depth: 0   # unity-builder inspects tags
 
       # The Unity Android image plus the Library cache does not fit next to the
       # runner's preinstalled toolchains, so reclaim the space we do not need.
@@ -52,6 +91,7 @@ jobs:
         uses: game-ci/unity-builder@v4
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
           BOA_VERSION: ${{ env.BOA_VERSION }}
@@ -63,11 +103,9 @@ jobs:
           buildMethod: BattleOfAgents.EditorTools.BuildScript.BuildAndroid
           allowDirtyBuild: true
           androidExportType: androidPackage
-          androidKeystoreName: boa.keystore
-          androidKeystoreBase64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          androidKeystorePass: ${{ secrets.ANDROID_KEYSTORE_PASS }}
-          androidKeyaliasName: ${{ secrets.ANDROID_KEYALIAS_NAME }}
-          androidKeyaliasPass: ${{ secrets.ANDROID_KEYALIAS_PASS }}
+          versioning: None          # BuildScript sets the version from BOA_VERSION
+          # No keystore inputs: the APK is signed with Unity's debug key, which is
+          # what you want for sideloading. Play Store uploads need a release key.
 
       - name: Locate the APK
         id: apk
@@ -94,12 +132,12 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update -qq && sudo apt-get install -y -qq p7zip-full
+          NAME="BattleOfAgents-${{ env.BOA_VERSION }}-${{ github.run_number }}"
           mkdir -p dist
-          cp "${{ steps.apk.outputs.path }}" "dist/BattleOfAgents-${{ env.BOA_VERSION }}-${{ github.run_number }}.apk"
+          cp "${{ steps.apk.outputs.path }}" "dist/$NAME.apk"
           cd dist
-          7z a -tzip -mx=9 -mfb=258 -mpass=15 -mmt=on \
-            "BattleOfAgents-${{ env.BOA_VERSION }}-${{ github.run_number }}.zip" ./*.apk
-          echo "zip_bytes=$(stat -c%s BattleOfAgents-${{ env.BOA_VERSION }}-${{ github.run_number }}.zip)" >> "$GITHUB_OUTPUT"
+          7z a -tzip -mx=9 -mfb=258 -mpass=15 -mmt=on "$NAME.zip" "$NAME.apk"
+          echo "zip_bytes=$(stat -c%s "$NAME.zip")" >> "$GITHUB_OUTPUT"
 
       - name: Size report
         run: |
@@ -115,6 +153,7 @@ jobs:
             printf "| saved by zip | %.1f%% |\n" "$(echo "100-($zip*100/$apk)" | bc -l)"
             echo ""
             echo "IL2CPP · ARM64 · engine code stripped · managed stripping High · LZ4HC · ASTC"
+            echo "Signed with Unity's debug key — enable \"install unknown apps\" to sideload."
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload artifact

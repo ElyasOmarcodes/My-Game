@@ -1,0 +1,47 @@
+name: Unity licence request
+
+# Run this once, by hand, to get the file Unity needs to issue a free personal
+# licence for CI. It does not build anything and needs no secrets.
+#
+#   1. Run this workflow.
+#   2. Download the "Unity_alf" artifact and unzip it.
+#   3. Go to https://license.unity3d.com/manual, upload the .alf, pick
+#      "Unity Personal" ▸ answer the two questions, and download the .ulf.
+#   4. Open the .ulf in a text editor, copy everything, and save it as the
+#      repository secret UNITY_LICENSE.
+#
+# The Android build workflow then runs on its own.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  activation:
+    name: Request activation file
+    runs-on: ubuntu-latest
+    steps:
+      - name: Request .alf
+        id: request
+        uses: game-ci/unity-request-activation-file@v2
+        with:
+          unityVersion: 2022.3.62f1
+
+      - name: Upload .alf
+        uses: actions/upload-artifact@v4
+        with:
+          name: Unity_alf
+          path: ${{ steps.request.outputs.filePath }}
+          retention-days: 7
+
+      - name: What to do next
+        run: |
+          {
+            echo "## Next steps"
+            echo ""
+            echo "1. Download the **Unity_alf** artifact from this run and unzip it."
+            echo "2. Upload the \`.alf\` at <https://license.unity3d.com/manual>,"
+            echo "   choose **Unity Personal**, and download the \`.ulf\` licence."
+            echo "3. Copy the whole \`.ulf\` file contents into a new repository secret"
+            echo "   named **UNITY_LICENSE** (Settings ▸ Secrets and variables ▸ Actions)."
+            echo "4. Re-run the **Android APK** workflow."
+          } >> "$GITHUB_STEP_SUMMARY"

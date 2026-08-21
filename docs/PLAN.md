@@ -43,9 +43,17 @@
 
 ## هغه څه چې ستاسو له خوا ته اړتیا لري
 
-۱. **`UNITY_LICENSE` راز (secret)** — پرته له دې GitHub Actions نشي کولی Unity چلوي.
-   د `.ulf` فایل منځپانګه په GitHub → Settings → Secrets کې کېږدئ.
-۲. **د خپرولو کيسټور (اختیاري)** — که غواړئ APK د خپل کيلي سره لاسلیک شي.
+**یوازې یو شی**: د `UNITY_LICENSE` راز. Unity پرته له جواز په CI کې نه چلیږي.
+
+۱. Actions ▸ **Unity licence request** ▸ Run workflow
+۲. د `Unity_alf` آرټیفکټ ښکته کړئ او unzip یې کړئ
+۳. `.alf` فایل په <https://license.unity3d.com/manual> کې پورته کړئ، **Unity Personal**
+   وټاکئ، او `.ulf` ښکته کړئ
+۴. د `.ulf` ټوله منځپانګه کاپي کړئ → Settings ▸ Secrets and variables ▸ Actions ▸
+   نوی راز په نامه **`UNITY_LICENSE`**
+
+کيسټور ته اړتیا نشته — APK د Unity په **ډیباګ کيلي** لاسلیک کیږي، نو په هر تلیفون کې
+د "unknown apps" اجازې سره نصبیږي.
 
 ## د پورټونو لیست
 

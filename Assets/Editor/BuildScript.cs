@@ -111,24 +111,18 @@ namespace BattleOfAgents.EditorTools
             ApplyKeystore();
         }
 
-        /// <summary>Signs with the release keystore when CI provides one; otherwise the
-        /// build falls back to Unity's debug key so local builds still install.</summary>
+        /// <summary>Debug-key signing.
+        ///
+        /// Unity's built-in debug keystore is used deliberately: the APK installs on
+        /// any phone with "unknown sources" enabled, and nobody has to manage a
+        /// release key to test a build. Swap to a custom keystore only when the game
+        /// is going to the Play Store — Google will not accept a debug-signed upload.</summary>
         static void ApplyKeystore()
         {
-            var keystore = Environment.GetEnvironmentVariable("ANDROID_KEYSTORE_PATH");
-            if (string.IsNullOrEmpty(keystore) || !File.Exists(keystore))
-            {
-                PlayerSettings.Android.useCustomKeystore = false;
-                Debug.Log("[Build] no release keystore — using the debug key");
-                return;
-            }
-
-            PlayerSettings.Android.useCustomKeystore = true;
-            PlayerSettings.Android.keystoreName = keystore;
-            PlayerSettings.Android.keystorePass = Environment.GetEnvironmentVariable("ANDROID_KEYSTORE_PASS");
-            PlayerSettings.Android.keyaliasName = Environment.GetEnvironmentVariable("ANDROID_KEYALIAS_NAME");
-            PlayerSettings.Android.keyaliasPass = Environment.GetEnvironmentVariable("ANDROID_KEYALIAS_PASS");
-            Debug.Log("[Build] signing with release keystore");
+            PlayerSettings.Android.useCustomKeystore = false;
+            PlayerSettings.Android.keystoreName = string.Empty;
+            PlayerSettings.Android.keyaliasName = string.Empty;
+            Debug.Log("[Build] signing with Unity's debug key (sideload-ready, not Play Store-ready)");
         }
 
         static string[] ScenePaths()
