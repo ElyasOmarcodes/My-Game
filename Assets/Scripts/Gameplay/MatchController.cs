@@ -15,6 +15,9 @@ namespace BattleOfAgents.Gameplay
 
         CityBuilder _city;
         PlayerController _local;
+
+        /// <summary>The locally controlled agent, or null between matches.</summary>
+        public PlayerController LocalPlayer { get { return _local; } }
         MatchState _state;
 
         void Awake()

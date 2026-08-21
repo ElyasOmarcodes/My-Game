@@ -231,6 +231,11 @@ namespace BattleOfAgents.UI.Screens
             _ammo.text = m.AmmoInClip + " / " + m.AmmoReserve;
             _ammo.color = m.AmmoInClip == 0 ? Theme.Danger : Theme.TextHi;
 
+            // The weapon name follows whatever the agent actually spawned holding.
+            var player = MatchController.Instance != null ? MatchController.Instance.LocalPlayer : null;
+            if (player != null && player.Weapon != null && player.Weapon.Weapon != null)
+                _weaponName.text = player.Weapon.Weapon.Name.ToUpperInvariant();
+
             FollowStick();
 
             if (!m.IsRunning) Router.Go(ScreenId.Results, false);

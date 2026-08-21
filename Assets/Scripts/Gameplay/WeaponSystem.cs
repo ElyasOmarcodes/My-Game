@@ -1,11 +1,14 @@
 using BattleOfAgents.Core;
+using BattleOfAgents.Gameplay.Models;
 using BattleOfAgents.Net;
 using BattleOfAgents.Visual;
 using UnityEngine;
 
 namespace BattleOfAgents.Gameplay
 {
-    /// <summary>Hit-scan weapon with per-agent fire rate, spread, ammo and reload.
+    /// <summary>Hit-scan weapon: fire rate, spread, ammo and reload all come from the
+    /// <see cref="WeaponDef"/> the agent carries, so the model in their hands and the
+    /// way it shoots can never drift apart.
     ///
     /// Shots are resolved locally for instant feedback and simultaneously reported to
     /// the host, which is the only place a hit actually counts. That is the standard
@@ -14,6 +17,7 @@ namespace BattleOfAgents.Gameplay
     public class WeaponSystem : MonoBehaviour
     {
         AgentDef _agent;
+        WeaponDef _weapon;
         Transform _muzzle;
         PlayerController _owner;
 
@@ -23,15 +27,30 @@ namespace BattleOfAgents.Gameplay
         float _tracerFadeUntil;
         Light _muzzleFlash;
 
-        const float Range = 120f;
         const float TracerLifetime = 0.05f;
 
-        public void Configure(AgentDef agent, Transform muzzle, PlayerController owner)
+        public WeaponDef Weapon { get { return _weapon; } }
+
+        public void Configure(AgentDef agent, WeaponDef weapon, Transform muzzle, PlayerController owner)
         {
             _agent = agent;
+            _weapon = weapon;
             _muzzle = muzzle;
             _owner = owner;
             BuildTracer();
+            LoadMagazine();
+        }
+
+        /// <summary>Seeds the match's ammo counters from this weapon, so a DMR starts
+        /// with six rounds and an SMG with thirty-five.</summary>
+        void LoadMagazine()
+        {
+            var match = MatchState.Instance;
+            if (match == null) return;
+
+            match.ClipSize = _weapon.ClipSize;
+            match.AmmoInClip = _weapon.ClipSize;
+            match.AmmoReserve = _weapon.Reserve;
         }
 
         void BuildTracer()
@@ -75,7 +94,7 @@ namespace BattleOfAgents.Gameplay
                 return;
             }
 
-            _nextShotAt = Time.time + 1f / Mathf.Max(0.1f, _agent.FireRate);
+            _nextShotAt = Time.time + 1f / Mathf.Max(0.1f, _weapon.FireRate);
             match.AmmoInClip--;
             Fire();
         }
@@ -84,33 +103,24 @@ namespace BattleOfAgents.Gameplay
         {
             var camera = CinematicRig.Instance.MainCamera;
             var origin = camera.transform.position;
-            var spread = _owner.IsAbilityActive && _agent.Id == "reaper" ? 0f : SpreadFor(_agent);
+            // Steady Aim removes spread entirely; that is the whole point of it.
+            var spread = _owner.IsAbilityActive && _agent.Id == "reaper" ? 0f : _weapon.Spread;
             var direction = camera.transform.forward +
                             camera.transform.right * Random.Range(-spread, spread) +
                             camera.transform.up * Random.Range(-spread, spread);
 
-            var endPoint = origin + direction.normalized * Range;
+            var endPoint = origin + direction.normalized * _weapon.Range;
 
             RaycastHit hit;
-            if (Physics.Raycast(origin, direction.normalized, out hit, Range))
+            if (Physics.Raycast(origin, direction.normalized, out hit, _weapon.Range))
             {
                 endPoint = hit.point;
                 ReportHit(hit);
             }
 
             ShowTracer(_muzzle != null ? _muzzle.position : origin, endPoint);
-            CinematicRig.Instance.Shake(_agent.Id == "reaper" ? 0.35f : 0.07f);
-        }
-
-        static float SpreadFor(AgentDef agent)
-        {
-            switch (agent.Id)
-            {
-                case "reaper": return 0.002f;
-                case "spectre": return 0.012f;
-                case "havoc": return 0.03f;
-                default: return 0.018f;
-            }
+            CinematicRig.Instance.Shake(0.04f * _weapon.RecoilKick);
+            if (_owner.Avatar != null) _owner.Avatar.PlayRecoil(_weapon.RecoilKick * 2.4f);
         }
 
         void ReportHit(RaycastHit hit)
@@ -121,7 +131,7 @@ namespace BattleOfAgents.Gameplay
             target.PlayHitFeedback();
 
             // The host decides whether this actually lands.
-            GameSync.Instance.ReportHit(target.PlayerId, _agent.Damage, hit.point);
+            GameSync.Instance.ReportHit(target.PlayerId, _weapon.Damage, hit.point);
         }
 
         void ShowTracer(Vector3 from, Vector3 to)
@@ -138,8 +148,8 @@ namespace BattleOfAgents.Gameplay
             var match = MatchState.Instance;
             if (match.AmmoReserve <= 0 || match.AmmoInClip == match.ClipSize) return;
 
-            _reloadUntil = Time.time + 1.6f;
-            Invoke("FinishReload", 1.6f);
+            _reloadUntil = Time.time + _weapon.ReloadSeconds;
+            Invoke("FinishReload", _weapon.ReloadSeconds);
         }
 
         void FinishReload()

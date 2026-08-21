@@ -1,4 +1,5 @@
 using BattleOfAgents.Core;
+using BattleOfAgents.Gameplay.Models;
 using BattleOfAgents.Gameplay.World;
 using BattleOfAgents.Visual;
 using UnityEngine;
@@ -59,7 +60,7 @@ namespace BattleOfAgents.Gameplay
             _controller = GetComponent<CharacterController>();
             Avatar = AgentAvatar.Create(transform, agent, team, label);
             Weapon = gameObject.AddComponent<WeaponSystem>();
-            Weapon.Configure(agent, Avatar.MuzzlePoint, this);
+            Weapon.Configure(agent, Avatar.Weapon, Avatar.MuzzlePoint, this);
         }
 
         void Update()
@@ -88,6 +89,7 @@ namespace BattleOfAgents.Gameplay
             Yaw += lookDelta.x * LookSensitivity;
             Pitch = Mathf.Clamp(Pitch - lookDelta.y * LookSensitivity, -35f, 55f);
             transform.rotation = Quaternion.Euler(0f, Yaw, 0f);
+            Avatar.SetAimPitch(Pitch);   // lean the torso with the aim
         }
 
         void Drive(Vector2 move)
