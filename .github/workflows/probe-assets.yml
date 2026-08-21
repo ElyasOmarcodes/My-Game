@@ -1,8 +1,7 @@
 name: Probe CC0 assets
 
-# Reconnaissance for the CC0 model packs: lists the model files inside the
-# candidate repositories and prints their licence text, so the build can pin
-# exact paths and the credits file can name the right authors.
+# Reconnaissance only. Lists the Kenney pack folders in the community mirror so
+# the build can sparse-checkout exactly the three kits the game needs.
 
 on:
   workflow_dispatch:
@@ -10,44 +9,49 @@ on:
 jobs:
   probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
-      - name: Inspect candidate packs
+      - name: Kenney mirror — pack folders
         run: |
-          repos=(
-            "KayKit-Game-Assets/KayKit-City-Builder-Bits-1.0"
-            "KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0"
-            "sketchpunklabs/kaykit_char"
-            "Malcolmnixon/Quaternius-Modular-Scifi-Pack"
-            "BoQsc/cc0-guns-explosives-pack-glb"
-            "KenneyNL/KayKit-Hexagons"
-          )
+          set -euo pipefail
+          # Blobless + no checkout: fetches the tree listing, not the 280 MB of files.
+          git clone --filter=blob:none --no-checkout --depth 1 \
+            https://github.com/ETdoFresh/kenney.nl.git mirror
+          cd mirror
 
-          for repo in "${repos[@]}"; do
-            echo "=============================================================="
-            echo "REPO: $repo"
+          echo "=== top level ==="
+          git ls-tree --name-only HEAD | head -40
 
-            meta=$(curl -sS --max-time 30 "https://api.github.com/repos/$repo")
-            branch=$(echo "$meta" | jq -r '.default_branch // "main"')
-            echo "  default branch: $branch   size: $(echo "$meta" | jq -r '.size') KB"
-            echo "  licence field:  $(echo "$meta" | jq -r '.license.spdx_id // "none"')"
+          echo "=== folders matching what we need ==="
+          git ls-tree -r --name-only HEAD \
+            | grep -oiE '^[^/]+/[^/]*(city|blaster|character|weapon|road|survival|nature)[^/]*' \
+            | cut -d/ -f1-2 | sort -u | head -40
 
-            echo "  --- licence file (first 6 lines)"
-            curl -sS --max-time 30 "https://api.github.com/repos/$repo/license" \
-              | jq -r '.content // ""' | base64 -d 2>/dev/null | head -6 | sed 's/^/    /' \
-              || echo "    (no licence file)"
+          echo "=== every 3D pack directory (depth 2) ==="
+          git ls-tree -r --name-only HEAD | cut -d/ -f1-2 | sort -u | head -80
 
-            echo "  --- model files"
-            curl -sS --max-time 60 "https://api.github.com/repos/$repo/git/trees/$branch?recursive=1" \
-              | jq -r '.tree[]? | select(.path | test("\\.(glb|gltf|fbx|obj)$"; "i")) | "    \(.path)  \(.size)"' \
-              | head -45
-            echo "  --- model file count by type"
-            curl -sS --max-time 60 "https://api.github.com/repos/$repo/git/trees/$branch?recursive=1" \
-              | jq -r '.tree[]? | .path' | grep -oiE '\.(glb|gltf|fbx|obj|png)$' | sort | uniq -c | sed 's/^/    /'
+      - name: Kenney mirror — inside the kits we want
+        run: |
+          set -euo pipefail
+          cd mirror
+          for needle in "City Kit" "Blaster" "Blocky Characters" "Mini Characters" "Weapon"; do
+            echo "=============================================="
+            echo "### $needle"
+            git ls-tree -r --name-only HEAD \
+              | grep -i "$needle" \
+              | grep -iE '\.(glb|gltf|fbx|obj)$' \
+              | head -30
+            echo "--- count:"
+            git ls-tree -r --name-only HEAD | grep -i "$needle" | grep -icE '\.(glb|gltf|fbx|obj)$' || true
           done
 
-      - name: Godot release assets available
+      - name: KayKit city kit — the gltf folder in full
         run: |
-          echo "--- godot 4.3-stable release files"
-          curl -sS --max-time 30 "https://api.github.com/repos/godotengine/godot/releases/tags/4.3-stable" \
-            | jq -r '.assets[]? | "\(.name)  \(.size)"' | grep -Ei 'linux|template' | head -20
+          set -euo pipefail
+          git clone --filter=blob:none --no-checkout --depth 1 \
+            https://github.com/KayKit-Game-Assets/KayKit-City-Builder-Bits-1.0.git kaykit
+          cd kaykit
+          echo "=== gltf models ==="
+          git ls-tree -r --name-only HEAD | grep -iE 'gltf.*\.(gltf|glb|bin)$' | head -60
+          echo "=== licence ==="
+          git ls-tree -r --name-only HEAD | grep -iE 'licen|readme' | head
