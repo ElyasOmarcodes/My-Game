@@ -101,7 +101,17 @@ jobs:
           cat ~/.config/godot/editor_settings-4.tres
 
       - name: Fetch the CC0 art kits
-        run: tools/fetch_assets.sh
+        run: |
+          set -euo pipefail
+          tools/fetch_assets.sh | tee /tmp/assets.log
+          # A silent miss would leave the game on placeholder primitives, which
+          # is exactly the failure this build exists to avoid.
+          total=$(python3 -c "import json;d=json.load(open('godot/assets/manifest.json'));print(sum(len(v) for v in d['categories'].values()))")
+          echo "asset_total=$total" >> "$GITHUB_ENV"
+          if [ "$total" -lt 20 ]; then
+            echo "::error::only $total models fetched — the kits did not land"
+            exit 1
+          fi
 
       - name: Import the project
         run: |
@@ -117,6 +127,20 @@ jobs:
           fi
           test -d godot/.godot/imported || { echo "::error::import produced no cache"; exit 1; }
           echo "imported $(find godot/.godot/imported -type f | wc -l) files"
+
+      - name: Smoke-test the project
+        run: |
+          set -euo pipefail
+          # Runs the real game loop for a few seconds. Import never surfaces
+          # GDScript runtime errors; this does.
+          timeout 90 godot --headless --path godot --quit-after 240 \
+            > /tmp/run.log 2>&1 || true
+          tail -60 /tmp/run.log
+
+          if grep -qE 'SCRIPT ERROR|Parse Error|Invalid call|Cannot call' /tmp/run.log; then
+            echo "::error::the project reported script errors on startup"
+            exit 1
+          fi
 
       - name: Export the APK
         run: |
@@ -165,7 +189,11 @@ jobs:
             printf "| ZIP (7z -mx=9) | %.2f MB |\n" "$(echo "$zip/1048576" | bc -l)"
             echo ""
             echo "Godot ${{ env.GODOT_RELEASE }} · arm64-v8a · debug-signed."
-            echo "Art: CC0 kits by Kenney and Kay Lousberg, fetched at build time."
+            echo "Art: **$asset_total CC0 models** by Kenney and Kay Lousberg."
+            echo ''
+            echo '```'
+            cat /tmp/assets.log
+            echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload APK
