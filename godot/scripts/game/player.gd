@@ -96,10 +96,15 @@ func _build_model() -> void:
 			scene = _library.pick("characters", AgentCatalog.agent_index(agent["id"]))
 
 	if scene:
-		var instance: Node = scene.instantiate()
-		_model_root.add_child(instance)
-		_animation = _find_animation_player(instance)
-		_tint(instance)
+		var instance := scene.instantiate() as Node3D
+		if instance:
+			_model_root.add_child(instance)
+			# Kits differ wildly in scale; a KayKit adventurer is several units
+			# tall out of the box. Everyone stands 1.8 m here.
+			ModelUtils.fit_height(instance, 1.8)
+			ModelUtils.rest_on_ground(instance)
+			_animation = _find_animation_player(instance)
+			_tint(instance)
 	else:
 		_build_placeholder()
 
@@ -146,8 +151,8 @@ func _attach_weapon() -> void:
 	if scene:
 		var instance := scene.instantiate() as Node3D
 		if instance:
-			instance.scale = Vector3.ONE * 0.9
 			_muzzle.add_child(instance)
+			ModelUtils.fit_height(instance, 0.55)
 	else:
 		_add_box(_muzzle, Vector3(0, 0, 0.2), Vector3(0.09, 0.12, 0.55), Color(0.08, 0.09, 0.1))
 		_add_box(_muzzle, Vector3(0, 0.08, 0.1), Vector3(0.03, 0.02, 0.1),

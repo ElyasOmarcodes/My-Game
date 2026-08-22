@@ -8,9 +8,10 @@ extends Node3D
 ## two players standing in different worlds. When no kit was fetched the same
 ## layout is built from primitives instead, which keeps the project runnable.
 
-const BLOCKS := 7
-const BLOCK_SIZE := 14.0
-const ROAD_WIDTH := 6.0
+const BLOCKS := 6
+const BLOCK_SIZE := 22.0
+const ROAD_WIDTH := 7.0
+const STOREY_HEIGHT := 3.0   ## what one floor should measure in world units
 const TILE := BLOCK_SIZE + ROAD_WIDTH
 
 var spawns: Array[Transform3D] = []
@@ -105,14 +106,8 @@ func _build_block(gx: int, gz: int) -> void:
 		_build_park(centre)
 		return
 
-	var lots := 2
-	var lot_size := BLOCK_SIZE / lots
-	for lx in lots:
-		for lz in lots:
-			var position := centre + Vector3(
-				-BLOCK_SIZE * 0.5 + lot_size * (lx + 0.5), 0.0,
-				-BLOCK_SIZE * 0.5 + lot_size * (lz + 0.5))
-			_place_building(position, _rng.randf() * 360.0)
+	# One building per block, turned to face a random street.
+	_place_building(centre, _rng.randi_range(0, 3) * 90.0)
 
 	for i in 3:
 		var offset := Vector3(
@@ -141,16 +136,130 @@ func _build_park(centre: Vector3) -> void:
 
 # --- placement ----------------------------------------------------------------
 
+## Kenney's town kit is modular — walls, roofs and doors, no whole houses — so a
+## building is assembled from its pieces on a grid measured from the wall itself.
+var _tile := 0.0
+var _storey := 0.0
+
+func _measure_module() -> void:
+	if _tile > 0.0 or _library == null:
+		return
+	var wall: PackedScene = _library.find("buildings", "wall")
+	if wall == null:
+		wall = _library.random("buildings")
+	var bounds := ModelUtils.measure(wall)
+	_tile = maxf(bounds.size.x, bounds.size.z)
+	_storey = bounds.size.y
+	if _tile <= 0.01:
+		_tile = 1.0
+	if _storey <= 0.01:
+		_storey = 1.0
+	print("[city] module %.2f x %.2f" % [_tile, _storey])
+
 func _place_building(position: Vector3, yaw: float) -> void:
-	var scene: PackedScene = _library.random("buildings") if _library else null
-	if scene:
-		_instance(scene, position, yaw, true, BLOCK_SIZE * 0.42)
-	else:
+	if _library == null or not _library.has("buildings"):
 		var height := _rng.randf_range(3.0, 7.0)
 		_primitive_block(position, Vector3(
 			_rng.randf_range(4.0, 6.0), height, _rng.randf_range(4.0, 6.0)),
 			Color(0.14, 0.15, 0.18), true)
+		_placed += 1
+		return
+
+	_measure_module()
+
+	var width := _rng.randi_range(2, 4)
+	var depth := _rng.randi_range(2, 3)
+	var storeys := _rng.randi_range(1, 3)
+
+	var shell := Node3D.new()
+	shell.position = position
+	shell.rotation.y = deg_to_rad(yaw)
+	add_child(shell)
+
+	var door_tile := _rng.randi_range(0, width - 1)
+
+	for level in storeys:
+		for x in width:
+			for z in depth:
+				# Only the perimeter gets walls; the inside is never seen.
+				if x > 0 and x < width - 1 and z > 0 and z < depth - 1:
+					continue
+				_place_wall_tile(shell, x, z, level, width, depth,
+					level == 0 and z == 0 and x == door_tile)
+
+	_cap_roof(shell, width, depth, storeys)
+
+	# The kit is authored around one-unit modules; scale the finished shell so a
+	# storey is one a person could walk into.
+	shell.scale = Vector3.ONE * (STOREY_HEIGHT / _storey)
+
+	# One collider for the whole footprint: far cheaper than a body per wall.
+	var size := Vector3(width * _tile, storeys * _storey, depth * _tile)
+	var centre := Vector3(0, size.y * 0.5, 0)
+	ModelUtils.add_box_collider(shell, AABB(centre - size * 0.5, size))
 	_placed += 1
+
+func _place_wall_tile(shell: Node3D, x: int, z: int, level: int,
+		width: int, depth: int, is_door: bool) -> void:
+	var kind := "wall"
+	if is_door:
+		kind = "door"
+	elif _rng.randf() < 0.45:
+		kind = "window"
+
+	var scene: PackedScene = _library.find("buildings", kind)
+	if scene == null:
+		scene = _library.find("buildings", "wall")
+	if scene == null:
+		return
+
+	var piece := scene.instantiate() as Node3D
+	if piece == null:
+		return
+
+	# Face each side outward. Which way the kit's own pieces face is a coin
+	# flip between kits, but staying consistent is what matters.
+	var yaw := 0.0
+	if z == depth - 1:
+		yaw = 180.0
+	elif x == 0:
+		yaw = 90.0
+	elif x == width - 1:
+		yaw = 270.0
+
+	piece.position = Vector3(
+		(x - (width - 1) * 0.5) * _tile,
+		level * _storey,
+		(z - (depth - 1) * 0.5) * _tile)
+	piece.rotation.y = deg_to_rad(yaw)
+	shell.add_child(piece)
+
+func _cap_roof(shell: Node3D, width: int, depth: int, storeys: int) -> void:
+	var roof: PackedScene = _library.find("buildings", "roof")
+	var top := storeys * _storey
+
+	if roof == null:
+		# No roof pieces in this kit: a thin cap still closes the silhouette.
+		var mesh := MeshInstance3D.new()
+		var box := BoxMesh.new()
+		box.size = Vector3(width * _tile * 1.05, _storey * 0.18, depth * _tile * 1.05)
+		mesh.mesh = box
+		mesh.position = Vector3(0, top + box.size.y * 0.5, 0)
+		var material := StandardMaterial3D.new()
+		material.albedo_color = Color(0.22, 0.13, 0.11)
+		mesh.material_override = material
+		shell.add_child(mesh)
+		return
+
+	for x in width:
+		for z in depth:
+			var piece := roof.instantiate() as Node3D
+			if piece == null:
+				continue
+			piece.position = Vector3(
+				(x - (width - 1) * 0.5) * _tile, top,
+				(z - (depth - 1) * 0.5) * _tile)
+			shell.add_child(piece)
 
 func _place_prop(hint: String, position: Vector3, yaw: float) -> void:
 	var scene: PackedScene = null
@@ -159,7 +268,7 @@ func _place_prop(hint: String, position: Vector3, yaw: float) -> void:
 		if scene == null:
 			scene = _library.random("props")
 	if scene:
-		_instance(scene, position, yaw, false)
+		_instance(scene, position, yaw, false, 0.0, 2.2 if hint == "tree" else 0.9)
 	elif hint == "tree":
 		_primitive_block(position, Vector3(0.3, 2.4, 0.3), Color(0.10, 0.08, 0.06), false)
 		_primitive_block(position + Vector3(0, 2.0, 0), Vector3(1.8, 1.4, 1.8),
@@ -172,7 +281,7 @@ func _place_prop(hint: String, position: Vector3, yaw: float) -> void:
 ## Instances a kit piece and, when it should block movement, wraps it in a body
 ## sized to its own bounds — the kits ship visuals only, no collision.
 func _instance(scene: PackedScene, position: Vector3, yaw: float, solid: bool,
-		fit_width := 0.0) -> void:
+		fit_width := 0.0, fit_height := 0.0) -> void:
 	var node: Node = scene.instantiate()
 	if not (node is Node3D):
 		return
@@ -184,9 +293,10 @@ func _instance(scene: PackedScene, position: Vector3, yaw: float, solid: bool,
 
 	var bounds := _visual_bounds(model)
 
-	# Kit pieces vary in size; nudge each one towards the lot it stands on so a
-	# cottage and a townhouse still read as the same town.
-	if fit_width > 0.0 and bounds.size.x > 0.001:
+	# Kits are authored at wildly different scales, so nothing is placed on faith.
+	if fit_height > 0.0:
+		ModelUtils.fit_height(model, fit_height)
+	elif fit_width > 0.0 and bounds.size.x > 0.001:
 		var largest := maxf(bounds.size.x, bounds.size.z)
 		model.scale = Vector3.ONE * clampf(fit_width / largest, 0.5, 3.5)
 

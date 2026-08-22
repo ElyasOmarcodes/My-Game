@@ -33,9 +33,12 @@ func _ready() -> void:
 			scene = library.pick("characters", AgentCatalog.agent_index(agent["id"]))
 
 	if scene:
-		var instance: Node = scene.instantiate()
-		add_child(instance)
-		_animation = _find_animation_player(instance)
+		var instance := scene.instantiate() as Node3D
+		if instance:
+			add_child(instance)
+			ModelUtils.fit_height(instance, 1.8)
+			ModelUtils.rest_on_ground(instance)
+			_animation = _find_animation_player(instance)
 	else:
 		var mesh := MeshInstance3D.new()
 		var capsule := CapsuleMesh.new()

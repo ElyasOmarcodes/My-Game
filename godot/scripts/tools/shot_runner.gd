@@ -92,7 +92,7 @@ func _run() -> void:
 		Vector3(road_x + CityBuilder.TILE * 0.8, 1.2, CityBuilder.TILE * 0.6), 62.0)
 
 	_spawn_lineup()
-	await _shot("godot-agents", Vector3(0.4, 1.55, 6.4), Vector3(0, 1.0, 0), 42.0)
+	await _shot("godot-agents", Vector3(0.3, 1.35, 5.2), Vector3(0, 0.95, 0), 44.0)
 
 func _spawn_lineup() -> void:
 	# A clean patch of street to stand the roster on.
@@ -117,7 +117,7 @@ func _spawn_lineup() -> void:
 			"team": Session.Team.ALPHA if index % 2 == 0 else Session.Team.BRAVO,
 		})
 		add_child(body)
-		body.global_position = stage + Vector3(-2.55 + index * 1.7, 0, 0)
+		body.global_position = stage + Vector3(-2.1 + index * 1.4, 0, 0)
 		body.rotation_degrees.y = 205 + (index - 1.5) * 6
 		index += 1
 
