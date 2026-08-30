@@ -19,6 +19,7 @@ var _target_yaw := 0.0
 var _animation: AnimationPlayer
 var _last_position := Vector3.ZERO
 var _model: Node3D
+var _mount: WeaponMount
 
 static func create(library: AssetLibrary, entry: Dictionary) -> RemotePlayer:
 	var body := RemotePlayer.new()
@@ -85,61 +86,12 @@ func place(where: Transform3D) -> void:
 	_target_yaw = where.basis.get_euler().y
 	rotation.y = _target_yaw
 
-## The agent's weapon, in its hand where the rig offers one.
+## The agent's weapon, on the same mount the local player uses.
 func _arm(library: AssetLibrary) -> void:
-	if library == null or not library.has("weapons") or _model == null:
-		return
-	var weapon := AgentCatalog.weapon(String(agent.get("weapon", "")))
-	var scene: PackedScene = library.find("weapons", String(weapon.get("model_hint", "")))
-	if scene == null:
-		scene = library.random("weapons")
-	if scene == null:
-		return
-	var instance := scene.instantiate() as Node3D
-	if instance == null:
-		return
-
-	var hand := ModelUtils.hand_attachment(_model)
-	if hand != null:
-		hand.add_child(instance)
-	else:
-		add_child(instance)
-		instance.position = Vector3(0.28, 1.2, 0.35)
-	ModelUtils.fit_height_world(instance, 0.6)
-
-## Takes a hit like the local player does, so a shot that lands is visible from
-## both ends and a drill target can actually be knocked down.
-func apply_damage(amount: float, _attacker_id: String) -> void:
-	if not alive:
-		return
-	health = maxf(0.0, health - amount)
-	_flash_hit()
-	if health <= 0.0:
-		alive = false
-		visible = false
-		await get_tree().create_timer(3.0).timeout
-		health = max_health
-		alive = true
-		visible = true
-
-func _flash_hit() -> void:
 	if _model == null:
 		return
-	var overlay := StandardMaterial3D.new()
-	overlay.albedo_color = Color(1.0, 0.25, 0.25, 0.55)
-	overlay.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	overlay.emission_enabled = true
-	overlay.emission = Color(1.0, 0.3, 0.3)
-	overlay.emission_energy_multiplier = 2.0
-	_paint(_model, overlay)
-	await get_tree().create_timer(0.12).timeout
-	_paint(_model, null)
-
-func _paint(node: Node, overlay: Material) -> void:
-	for child in node.get_children():
-		if child is MeshInstance3D:
-			(child as MeshInstance3D).material_overlay = overlay
-		_paint(child, overlay)
+	_mount = WeaponMount.attach(self, library,
+		AgentCatalog.weapon(String(agent.get("weapon", ""))), _model)
 
 func _process(delta: float) -> void:
 	if has_meta("target_position"):
@@ -151,6 +103,8 @@ func _process(delta: float) -> void:
 	rotation.y = lerp_angle(rotation.y, _target_yaw, 1.0 - exp(-ROTATION_SMOOTHING * delta))
 
 	_drive_animation(travelled / maxf(delta, 0.0001))
+	if _mount != null:
+		_mount.follow(global_rotation.y)
 
 func _drive_animation(speed: float) -> void:
 	if _animation == null:
