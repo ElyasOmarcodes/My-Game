@@ -233,7 +233,17 @@ func consume_look() -> Vector2:
 ##
 ## Keys are read directly rather than through the input map: a hand-written map
 ## in project.godot is one typo away from breaking the whole project file.
-var _desktop := not DisplayServer.is_touchscreen_available()
+## Whether keyboard and mouse should be read at all.
+##
+## On a phone they must not be: a screen tap arrives as an emulated left mouse
+## click — which the menu's buttons need in order to work — and reading that
+## same click as the trigger turned the entire screen into a fire button.
+##
+## Both tests, because the platform feature is what an Android export reports
+## and the touchscreen query is what a touch-capable laptop reports; getting
+## this wrong in the false direction brings the fire-anywhere bug straight back.
+var _desktop := not (OS.has_feature("mobile") \
+	or DisplayServer.is_touchscreen_available())
 
 func move_axis() -> Vector2:
 	if not _desktop:

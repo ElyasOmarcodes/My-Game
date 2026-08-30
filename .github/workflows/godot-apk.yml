@@ -116,6 +116,10 @@ jobs:
           # Per category: a total hides a category that came back empty.
           python3 tools/check_assets.py
 
+          # Settings the headless smoke test cannot see — it has no screen and
+          # no finger, so it cannot tell that nothing is clickable.
+          python3 tools/check_project.py
+
       - name: Import the project
         run: |
           set -euo pipefail
