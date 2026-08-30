@@ -20,42 +20,7 @@ func _ready() -> void:
 	NetGame.roster_changed.connect(_on_roster_changed)
 
 func _build_environment() -> void:
-	var light := DirectionalLight3D.new()
-	light.rotation_degrees = Vector3(-38, 42, 0)
-	light.light_color = Color(1.0, 0.88, 0.74)
-	light.light_energy = 1.9
-	light.shadow_enabled = true
-	add_child(light)
-
-	var fill := DirectionalLight3D.new()
-	fill.rotation_degrees = Vector3(-16, -128, 0)
-	fill.light_color = Color(0.62, 0.74, 1.0)
-	fill.light_energy = 0.7
-	fill.shadow_enabled = false
-	add_child(fill)
-
-	var environment := Environment.new()
-	environment.background_mode = Environment.BG_SKY
-	environment.sky = Sky.new()
-	var sky_material := ProceduralSkyMaterial.new()
-	sky_material.sky_top_color = Color(0.10, 0.16, 0.28)
-	sky_material.sky_horizon_color = Color(0.28, 0.30, 0.34)
-	sky_material.ground_bottom_color = Color(0.04, 0.05, 0.07)
-	sky_material.ground_horizon_color = Color(0.18, 0.19, 0.22)
-	environment.sky.sky_material = sky_material
-
-	environment.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	environment.ambient_light_energy = 2.2
-	environment.fog_enabled = true
-	environment.fog_light_color = Color(0.16, 0.20, 0.28)
-	environment.fog_density = 0.0035
-	environment.tonemap_mode = Environment.TONE_MAPPER_ACES
-	environment.glow_enabled = true
-	environment.glow_intensity = 0.5
-
-	var world := WorldEnvironment.new()
-	world.environment = environment
-	add_child(world)
+	WorldLook.apply(self)
 
 func _show_menu() -> void:
 	menu = MainMenu.new()
@@ -106,6 +71,7 @@ func _start_match(map_seed: int) -> void:
 
 	city = CityBuilder.new()
 	add_child(city)
+	city.spawns_ready.connect(_on_spawns_ready)
 	city.build(library, map_seed)
 
 	local_player = Player.create(library, Session.agent_id, Session.team,
@@ -122,6 +88,18 @@ func _start_match(map_seed: int) -> void:
 		hud.flash("Art kits not bundled — running on placeholders", 5.0)
 
 	_sync_remote_players()
+
+## A supplied map's floor only exists once physics has seen it, so the spawns
+## are provisional until then and everyone is re-seated when they firm up.
+func _on_spawns_ready() -> void:
+	if local_player:
+		local_player.global_transform = city.spawn_for(0, Session.team)
+	var index := 1
+	for peer_id in NetGame.remote_players:
+		var body: Node = NetGame.remote_players[peer_id]
+		if body is RemotePlayer:
+			(body as RemotePlayer).place(city.spawn_for(index, Session.Team.BRAVO))
+		index += 1
 
 func _sync_remote_players() -> void:
 	var wanted: Dictionary = {}
@@ -144,6 +122,6 @@ func _sync_remote_players() -> void:
 			continue
 		var body := RemotePlayer.create(library, wanted[peer_id])
 		add_child(body)
-		body.global_transform = city.spawn_for(index, int(wanted[peer_id].get("team", 1)))
+		body.place(city.spawn_for(index, int(wanted[peer_id].get("team", 1))))
 		NetGame.remote_players[peer_id] = body
 		index += 1

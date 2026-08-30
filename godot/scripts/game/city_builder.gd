@@ -9,9 +9,9 @@ extends Node3D
 ## layout is built from primitives instead, which keeps the project runnable.
 
 const BLOCKS := 6
-const BLOCK_SIZE := 22.0
-const ROAD_WIDTH := 7.0
-const STOREY_HEIGHT := 3.0   ## what one floor should measure in world units
+const BLOCK_SIZE := 24.0
+const ROAD_WIDTH := 8.0
+const STOREY_HEIGHT := 3.2   ## what one floor should measure in world units
 const TILE := BLOCK_SIZE + ROAD_WIDTH
 
 var spawns: Array[Transform3D] = []
@@ -20,10 +20,18 @@ var _rng := RandomNumberGenerator.new()
 var _library: AssetLibrary
 var _placed := 0
 
+signal spawns_ready
+
 func build(library: AssetLibrary, map_seed: int) -> void:
 	_library = library
 	_rng.seed = map_seed
 	spawns.clear()
+
+	# A map somebody drew beats one a loop generates, so it wins when present.
+	if _build_supplied_map():
+		_ring_spawns()
+		print("[city] supplied map, %d spawns" % spawns.size())
+		return
 
 	_build_ground()
 	_build_roads()
@@ -34,8 +42,117 @@ func build(library: AssetLibrary, map_seed: int) -> void:
 
 	print("[city] %d pieces placed, %d spawns" % [_placed, spawns.size()])
 
+## How wide the playable area is, whichever way it was built.
 func span() -> float:
+	if _from_map:
+		return maxf(_map_bounds.size.x, _map_bounds.size.z)
 	return BLOCKS * BLOCK_SIZE + (BLOCKS + 1) * ROAD_WIDTH
+
+## The middle of the playable area — a supplied map need not sit on the origin.
+func centre() -> Vector3:
+	if _from_map:
+		return Vector3(_map_bounds.get_center().x, 0.0, _map_bounds.get_center().z)
+	return Vector3.ZERO
+
+# --- a map that came ready-made -----------------------------------------------
+
+const MAP_TARGET_SPAN := 320.0   ## what a map gets resized to when it arrives in
+const MAP_MIN_SPAN := 45.0       ## some unit other than metres
+const MAP_MAX_SPAN := 900.0
+
+var _map_bounds := AABB()
+var _from_map := false
+var _spawns_resolved := false
+
+func _build_supplied_map() -> bool:
+	if _library == null or not _library.has("map"):
+		return false
+	var scene := _library.pick("map", 0)
+	if scene == null:
+		return false
+
+	var level := scene.instantiate() as Node3D
+	if level == null:
+		push_warning("[map] the supplied map is not a 3D scene")
+		return false
+	add_child(level)
+
+	var bounds := ModelUtils.visual_bounds(level)
+	var measured := maxf(bounds.size.x, bounds.size.z)
+	print("[map] loaded, bounds %.1f x %.1f x %.1f" % [
+		bounds.size.x, bounds.size.y, bounds.size.z])
+
+	if measured <= 0.001:
+		push_warning("[map] the supplied map has no visible geometry")
+		level.queue_free()
+		return false
+
+	# Authored in centimetres, or in some engine's own unit: rescale rather than
+	# drop the player into a map the size of a shoebox or a continent.
+	if measured < MAP_MIN_SPAN or measured > MAP_MAX_SPAN:
+		var factor := MAP_TARGET_SPAN / measured
+		level.scale = Vector3.ONE * factor
+		bounds = AABB(bounds.position * factor, bounds.size * factor)
+		print("[map] rescaled by %.4f to a %.0f m span" % [factor, MAP_TARGET_SPAN])
+
+	# Rest it on y = 0 so the fallback ground plane is never the thing you land on.
+	level.position.y -= bounds.position.y
+	bounds.position.y = 0.0
+	_map_bounds = bounds
+	_from_map = true
+
+	_add_map_collision(level)
+	_placed += 1
+	return true
+
+## The kits and most exported levels ship visuals only, so the walkable surface
+## has to be built from the meshes themselves.
+func _add_map_collision(level: Node3D) -> void:
+	var surfaces := 0
+	for node in level.find_children("*", "MeshInstance3D", true, false):
+		var mesh_instance := node as MeshInstance3D
+		if mesh_instance == null or mesh_instance.mesh == null:
+			continue
+		mesh_instance.create_trimesh_collision()
+		surfaces += 1
+	print("[map] %d collision surfaces" % surfaces)
+
+## Provisional spawn points around the middle of the map. They are refined onto
+## the actual floor on the first physics frame, once the trimesh bodies exist.
+func _ring_spawns() -> void:
+	var middle := centre()
+	var radius := span() * 0.3
+	for i in 8:
+		var angle := TAU * i / 8.0
+		var position := middle + Vector3(cos(angle) * radius,
+			_map_bounds.size.y + 3.0, sin(angle) * radius)
+		var basis := Basis(Vector3.UP, angle + PI)
+		spawns.append(Transform3D(basis, position))
+
+func _physics_process(_delta: float) -> void:
+	if _spawns_resolved or not _from_map:
+		set_physics_process(false)
+		return
+	_spawns_resolved = true
+	set_physics_process(false)
+	_drop_spawns_to_floor()
+	spawns_ready.emit()
+
+func _drop_spawns_to_floor() -> void:
+	var space := get_world_3d().direct_space_state
+	if space == null:
+		return
+	for i in spawns.size():
+		var from: Vector3 = spawns[i].origin
+		var query := PhysicsRayQueryParameters3D.create(
+			from, from + Vector3.DOWN * (_map_bounds.size.y + 60.0))
+		query.collide_with_areas = false
+		var hit: Dictionary = space.intersect_ray(query)
+		if hit.is_empty():
+			continue
+		var floor_point: Vector3 = hit["position"]
+		spawns[i] = Transform3D(spawns[i].basis, floor_point + Vector3(0, 1.2, 0))
+	print("[map] spawns dropped onto the floor")
 
 # --- ground and roads ---------------------------------------------------------
 
@@ -137,38 +254,51 @@ func _build_park(centre: Vector3) -> void:
 # --- placement ----------------------------------------------------------------
 
 ## Kenney's town kit is modular — walls, roofs and doors, no whole houses — so a
-## building is assembled from its pieces on a grid measured from the wall itself.
-var _tile := 0.0
-var _storey := 0.0
+## house is assembled from those pieces on a grid whose cell size comes from the
+## wall module itself.
+var _cell := 0.0        ## world size of one module cell
+var _measured := false
 
 func _measure_module() -> void:
-	if _tile > 0.0 or _library == null:
+	if _measured:
 		return
-	var wall: PackedScene = _library.find("buildings", "wall")
+	_measured = true
+	_cell = STOREY_HEIGHT
+
+	var wall: PackedScene = _wall_scene("wall")
 	if wall == null:
-		wall = _library.random("buildings")
+		return
 	var bounds := ModelUtils.measure(wall)
-	_tile = maxf(bounds.size.x, bounds.size.z)
-	_storey = bounds.size.y
-	if _tile <= 0.01:
-		_tile = 1.0
-	if _storey <= 0.01:
-		_storey = 1.0
-	print("[city] module %.2f x %.2f" % [_tile, _storey])
+	if bounds.size.x <= 0.001 or bounds.size.y <= 0.001:
+		return
+
+	# A wall module is one storey tall by construction, so sizing the cell by the
+	# module's own aspect ratio makes a storey a storey however the kit is drawn.
+	_cell = clampf(STOREY_HEIGHT * bounds.size.x / bounds.size.y, 1.5, 6.0)
+	print("[city] wall module %.2f x %.2f -> cell %.2f" % [bounds.size.x, bounds.size.y, _cell])
+
+## Wall modules, preferring a plain one over an arch or a broken ruin.
+func _wall_scene(hint: String) -> PackedScene:
+	if _library == null or not _library.has("walls"):
+		return null
+	var scene: PackedScene = _library.find("walls", hint)
+	if scene == null:
+		scene = _library.find("walls", "wall")
+	return scene
 
 func _place_building(position: Vector3, yaw: float) -> void:
-	if _library == null or not _library.has("buildings"):
-		var height := _rng.randf_range(3.0, 7.0)
+	_measure_module()
+
+	if _library == null or not _library.has("walls"):
+		var height := _rng.randf_range(4.0, 9.0)
 		_primitive_block(position, Vector3(
-			_rng.randf_range(4.0, 6.0), height, _rng.randf_range(4.0, 6.0)),
-			Color(0.14, 0.15, 0.18), true)
+			_rng.randf_range(6.0, 9.0), height, _rng.randf_range(6.0, 9.0)),
+			Color(0.34, 0.32, 0.30), true)
 		_placed += 1
 		return
 
-	_measure_module()
-
-	var width := _rng.randi_range(2, 4)
-	var depth := _rng.randi_range(2, 3)
+	var width := _rng.randi_range(3, 5)
+	var depth := _rng.randi_range(3, 4)
 	var storeys := _rng.randi_range(1, 3)
 
 	var shell := Node3D.new()
@@ -176,89 +306,76 @@ func _place_building(position: Vector3, yaw: float) -> void:
 	shell.rotation.y = deg_to_rad(yaw)
 	add_child(shell)
 
-	var door_tile := _rng.randi_range(0, width - 1)
+	var half_x := width * _cell * 0.5
+	var half_z := depth * _cell * 0.5
+	var door_at := _rng.randi_range(0, width - 1)
 
 	for level in storeys:
+		var y := level * STOREY_HEIGHT
+		# Walls sit on the four edge planes of the footprint, not in its cells:
+		# on the cells the corners never meet and the house reads as loose panels.
 		for x in width:
-			for z in depth:
-				# Only the perimeter gets walls; the inside is never seen.
-				if x > 0 and x < width - 1 and z > 0 and z < depth - 1:
-					continue
-				_place_wall_tile(shell, x, z, level, width, depth,
-					level == 0 and z == 0 and x == door_tile)
+			var along := (x - (width - 1) * 0.5) * _cell
+			_wall(shell, Vector3(along, y, -half_z), 0.0,
+				level == 0 and x == door_at)
+			_wall(shell, Vector3(along, y, half_z), 180.0, false)
+		for z in depth:
+			var along := (z - (depth - 1) * 0.5) * _cell
+			_wall(shell, Vector3(-half_x, y, along), 90.0, false)
+			_wall(shell, Vector3(half_x, y, along), 270.0, false)
 
 	_cap_roof(shell, width, depth, storeys)
 
-	# The kit is authored around one-unit modules; scale the finished shell so a
-	# storey is one a person could walk into.
-	shell.scale = Vector3.ONE * (STOREY_HEIGHT / _storey)
-
 	# One collider for the whole footprint: far cheaper than a body per wall.
-	var size := Vector3(width * _tile, storeys * _storey, depth * _tile)
-	var centre := Vector3(0, size.y * 0.5, 0)
-	ModelUtils.add_box_collider(shell, AABB(centre - size * 0.5, size))
+	var size := Vector3(width * _cell, storeys * STOREY_HEIGHT, depth * _cell)
+	ModelUtils.add_box_collider(shell, AABB(
+		Vector3(-size.x * 0.5, 0.0, -size.z * 0.5), size))
 	_placed += 1
 
-func _place_wall_tile(shell: Node3D, x: int, z: int, level: int,
-		width: int, depth: int, is_door: bool) -> void:
-	var kind := "wall"
+func _wall(shell: Node3D, at: Vector3, yaw: float, is_door: bool) -> void:
+	var hint := "wall"
 	if is_door:
-		kind = "door"
-	elif _rng.randf() < 0.45:
-		kind = "window"
+		hint = "door"
+	elif _rng.randf() < 0.4:
+		hint = "window"
 
-	var scene: PackedScene = _library.find("buildings", kind)
-	if scene == null:
-		scene = _library.find("buildings", "wall")
-	if scene == null:
-		return
-
-	var piece := scene.instantiate() as Node3D
+	var piece := ModelUtils.module(_wall_scene(hint), _cell)
 	if piece == null:
 		return
-
-	# Face each side outward. Which way the kit's own pieces face is a coin
-	# flip between kits, but staying consistent is what matters.
-	var yaw := 0.0
-	if z == depth - 1:
-		yaw = 180.0
-	elif x == 0:
-		yaw = 90.0
-	elif x == width - 1:
-		yaw = 270.0
-
-	piece.position = Vector3(
-		(x - (width - 1) * 0.5) * _tile,
-		level * _storey,
-		(z - (depth - 1) * 0.5) * _tile)
+	piece.position = at
 	piece.rotation.y = deg_to_rad(yaw)
 	shell.add_child(piece)
 
 func _cap_roof(shell: Node3D, width: int, depth: int, storeys: int) -> void:
-	var roof: PackedScene = _library.find("buildings", "roof")
-	var top := storeys * _storey
+	var top := storeys * STOREY_HEIGHT
+	var roof: PackedScene = null
+	if _library and _library.has("roofs"):
+		# A flat cap tiles across any footprint; a gable only reads right on a
+		# roof one module deep, and this town has none.
+		roof = _library.find("roofs", "roofflat")
+		if roof == null:
+			roof = _library.find("roofs", "roof")
 
 	if roof == null:
-		# No roof pieces in this kit: a thin cap still closes the silhouette.
 		var mesh := MeshInstance3D.new()
 		var box := BoxMesh.new()
-		box.size = Vector3(width * _tile * 1.05, _storey * 0.18, depth * _tile * 1.05)
+		box.size = Vector3(width * _cell * 1.06, 0.35, depth * _cell * 1.06)
 		mesh.mesh = box
 		mesh.position = Vector3(0, top + box.size.y * 0.5, 0)
 		var material := StandardMaterial3D.new()
-		material.albedo_color = Color(0.22, 0.13, 0.11)
+		material.albedo_color = Color(0.35, 0.20, 0.16)
 		mesh.material_override = material
 		shell.add_child(mesh)
 		return
 
 	for x in width:
 		for z in depth:
-			var piece := roof.instantiate() as Node3D
+			var piece := ModelUtils.module(roof, _cell)
 			if piece == null:
 				continue
 			piece.position = Vector3(
-				(x - (width - 1) * 0.5) * _tile, top,
-				(z - (depth - 1) * 0.5) * _tile)
+				(x - (width - 1) * 0.5) * _cell, top,
+				(z - (depth - 1) * 0.5) * _cell)
 			shell.add_child(piece)
 
 func _place_prop(hint: String, position: Vector3, yaw: float) -> void:

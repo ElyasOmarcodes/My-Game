@@ -1,5 +1,11 @@
 {
-  "_comment": "Which CC0 kits the build fetches. Swap these to change the art without touching code — the loader matches models by category and filename hint.",
+  "_comment": "Where the build gets its art. Swapping a source here changes the game's look without touching code — the loader matches models by category and filename hint.",
+  "map": {
+    "_comment": "A ready-made level. When this downloads and contains a model the game uses it as the world; otherwise it assembles a town from the kit modules below.",
+    "name": "Supplied map",
+    "url": "https://cdn.z-s.workers.dev/d0cb74f2-627d-4acc-bf83-4cf5cbf5c7c9",
+    "supplied_by": "repository owner"
+  },
   "sources": [
     {
       "name": "Kenney kits",
@@ -14,10 +20,20 @@
       "folders": ["addons"],
       "author": "Kay Lousberg",
       "licence": "CC0-1.0"
+    },
+    {
+      "name": "Quaternius Universal Animation Library",
+      "url": "https://github.com/J-Ponzo/gltf-universal-animation-library.git",
+      "folders": ["glTF"],
+      "author": "Quaternius",
+      "licence": "CC0-1.0",
+      "why": "Human-proportioned rigged bodies with idle/walk/run, rather than the chibi adventurers"
     }
   ],
   "categories": {
-    "buildings": "Placed on the blocks between roads",
+    "map": "A whole level, used as-is when one was supplied",
+    "walls": "Wall modules a house is assembled from",
+    "roofs": "Roof modules that cap a house",
     "props": "Scattered cover, trees, barrels, lanterns",
     "characters": "Rigged agent bodies, matched by AgentCatalog.model_hint",
     "weapons": "Held models, matched by weapon model_hint"

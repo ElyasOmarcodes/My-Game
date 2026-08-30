@@ -151,8 +151,15 @@ func _attach_weapon() -> void:
 	if scene:
 		var instance := scene.instantiate() as Node3D
 		if instance:
-			_muzzle.add_child(instance)
-			ModelUtils.fit_height(instance, 0.55)
+			# In the hand when the rig offers one, at the hip when it does not.
+			var hand: BoneAttachment3D = null
+			if _model_root.get_child_count() > 0:
+				hand = ModelUtils.hand_attachment(_model_root.get_child(0) as Node3D)
+			if hand != null:
+				hand.add_child(instance)
+			else:
+				_muzzle.add_child(instance)
+			ModelUtils.fit_height_world(instance, 0.6)
 	else:
 		_add_box(_muzzle, Vector3(0, 0, 0.2), Vector3(0.09, 0.12, 0.55), Color(0.08, 0.09, 0.1))
 		_add_box(_muzzle, Vector3(0, 0.08, 0.1), Vector3(0.03, 0.02, 0.1),
@@ -165,11 +172,11 @@ func _tint(node: Node) -> void:
 	for child in node.get_children():
 		if child is MeshInstance3D:
 			var overlay := StandardMaterial3D.new()
-			overlay.albedo_color = Color(accent.r, accent.g, accent.b, 0.22)
+			overlay.albedo_color = Color(accent.r, accent.g, accent.b, 0.12)
 			overlay.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 			overlay.emission_enabled = true
 			overlay.emission = accent
-			overlay.emission_energy_multiplier = 0.6
+			overlay.emission_energy_multiplier = 0.25
 			child.material_overlay = overlay
 		_tint(child)
 

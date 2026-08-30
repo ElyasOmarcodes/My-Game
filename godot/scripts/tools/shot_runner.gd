@@ -39,73 +39,45 @@ func _ready() -> void:
 	get_tree().quit()
 
 func _build_environment() -> void:
-	var light := DirectionalLight3D.new()
-	light.rotation_degrees = Vector3(-36, 44, 0)
-	light.light_color = Color(1.0, 0.89, 0.76)
-	light.light_energy = 1.9
-	light.shadow_enabled = true
-	add_child(light)
-
-	var fill := DirectionalLight3D.new()
-	fill.rotation_degrees = Vector3(-16, -128, 0)
-	fill.light_color = Color(0.62, 0.74, 1.0)
-	fill.light_energy = 0.7
-	fill.shadow_enabled = false
-	add_child(fill)
-
-	var environment := Environment.new()
-	environment.background_mode = Environment.BG_SKY
-	environment.sky = Sky.new()
-
-	var sky_material := ProceduralSkyMaterial.new()
-	sky_material.sky_top_color = Color(0.10, 0.17, 0.30)
-	sky_material.sky_horizon_color = Color(0.32, 0.34, 0.38)
-	sky_material.ground_bottom_color = Color(0.04, 0.05, 0.07)
-	sky_material.ground_horizon_color = Color(0.18, 0.19, 0.22)
-	environment.sky.sky_material = sky_material
-
-	environment.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	environment.ambient_light_energy = 2.2
-	environment.fog_enabled = true
-	environment.fog_light_color = Color(0.17, 0.21, 0.29)
-	environment.fog_density = 0.004
-	environment.tonemap_mode = Environment.TONE_MAPPER_ACES
-
-	var world := WorldEnvironment.new()
-	world.environment = environment
-	add_child(world)
+	WorldLook.apply(self)
 
 func _run() -> void:
+	# Physics has to tick once before a supplied map has a floor to stand on.
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+
 	var span := _city.span()
+	var middle := _city.centre()
 
 	await _shot("godot-town-aerial",
-		Vector3(-span * 0.42, span * 0.34, -span * 0.42), Vector3(0, 1.5, 0), 50.0)
+		middle + Vector3(-span * 0.42, span * 0.34, -span * 0.42),
+		middle + Vector3(0, 1.5, 0), 50.0)
 
-	# Stand on a road and look down it, at head height.
-	var road_x := -span * 0.5 + CityBuilder.ROAD_WIDTH * 0.5 + CityBuilder.TILE * 3.0
-	await _shot("godot-town-street",
-		Vector3(road_x, 1.7, -span * 0.34),
-		Vector3(road_x, 2.6, span * 0.3), 70.0)
+	# Head height, looking across the map.
+	var eye := _city.spawn_for(0, Session.Team.ALPHA).origin + Vector3(0, 1.0, 0)
+	await _shot("godot-town-street", eye, middle + Vector3(0, 2.0, 0), 70.0)
 
 	await _shot("godot-town-corner",
-		Vector3(road_x - CityBuilder.TILE * 0.5, 3.4, -CityBuilder.TILE * 1.2),
-		Vector3(road_x + CityBuilder.TILE * 0.8, 1.2, CityBuilder.TILE * 0.6), 62.0)
+		middle + Vector3(span * 0.16, 6.0, -span * 0.2),
+		middle + Vector3(span * 0.02, 1.5, 0), 62.0)
 
-	_spawn_lineup()
-	await _shot("godot-agents", Vector3(0.3, 1.35, 5.2), Vector3(0, 0.95, 0), 44.0)
+	var stage := middle + Vector3(0, 400.0, 0)
+	_spawn_lineup(stage)
+	await _shot("godot-agents",
+		stage + Vector3(0.3, 1.35, 5.4), stage + Vector3(0, 0.95, 0), 44.0)
+	await _shot("godot-weapons",
+		stage + Vector3(-0.2, 1.15, 2.4), stage + Vector3(-0.2, 1.05, 0), 34.0)
 
-func _spawn_lineup() -> void:
-	# A clean patch of street to stand the roster on.
-	var stage := Vector3(0, 60, 0)
-	_camera.position += stage
-
+## The roster on a clean plate, well clear of the map so nothing photobombs it.
+func _spawn_lineup(stage: Vector3) -> void:
 	var floor_mesh := MeshInstance3D.new()
 	var plate := BoxMesh.new()
-	plate.size = Vector3(20, 0.4, 20)
+	plate.size = Vector3(24, 0.4, 24)
 	floor_mesh.mesh = plate
 	floor_mesh.position = stage + Vector3(0, -0.2, 0)
 	var material := StandardMaterial3D.new()
-	material.albedo_color = Color(0.09, 0.10, 0.13)
+	material.albedo_color = Color(0.42, 0.41, 0.39)
+	material.roughness = 0.9
 	floor_mesh.material_override = material
 	add_child(floor_mesh)
 
@@ -117,8 +89,9 @@ func _spawn_lineup() -> void:
 			"team": Session.Team.ALPHA if index % 2 == 0 else Session.Team.BRAVO,
 		})
 		add_child(body)
-		body.global_position = stage + Vector3(-2.1 + index * 1.4, 0, 0)
-		body.rotation_degrees.y = 205 + (index - 1.5) * 6
+		var yaw := deg_to_rad(185.0 + (index - 1.5) * 7.0)
+		body.place(Transform3D(Basis(Vector3.UP, yaw),
+			stage + Vector3(-2.4 + index * 1.6, 0, 0)))
 		index += 1
 
 func _shot(name: String, from: Vector3, look_at: Vector3, fov: float) -> void:

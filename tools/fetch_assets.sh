@@ -46,6 +46,68 @@ collect() {
   echo "    $category  +$copied  ($pattern)"
 }
 
+# --- the supplied map ----------------------------------------------------------
+#
+# A whole level beats a generated one, so if godot/assets.json names a map the
+# build downloads it here. The URL is not reachable from the development sandbox
+# (the egress policy blocks it) — the runner is the only place this can be
+# fetched and identified, so it reports loudly what it got.
+
+MAP_URL="$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('map',{}).get('url',''))" "$CONFIG")"
+
+fetch_map() {
+  [ -n "$MAP_URL" ] || { echo "==> no map url configured"; return 0; }
+
+  echo "==> map  $MAP_URL"
+  mkdir -p "$WORK/map" "$DEST/map"
+  local blob="$WORK/map/download.bin"
+
+  if ! curl -fsSL --retry 3 --retry-delay 2 --max-time 600 -o "$blob" "$MAP_URL"; then
+    echo "::warning::map download failed — falling back to the generated town"
+    return 0
+  fi
+
+  echo "    $(stat -c%s "$blob") bytes"
+  echo "    type: $(file -b "$blob")"
+
+  # The link gives no filename or extension, so unpack by content sniffing.
+  local kind; kind="$(file -b --mime-type "$blob")"
+  case "$kind" in
+    application/zip)  (cd "$WORK/map" && unzip -q -o download.bin) || true ;;
+    application/x-7z-compressed) 7z x -y -o"$WORK/map" "$blob" >/dev/null || true ;;
+    application/gzip|application/x-gzip|application/x-tar)
+      tar -xf "$blob" -C "$WORK/map" 2>/dev/null || true ;;
+    *) ;;
+  esac
+
+  echo "    unpacked contents:"
+  find "$WORK/map" -type f -printf '      %10s  %P\n' 2>/dev/null | sort -k2 | head -80
+  echo "      ($(find "$WORK/map" -type f | wc -l) files total)"
+
+  # A .gltf needs its .bin buffers and textures beside it, so the tree is kept
+  # rather than flattened the way the module kits are.
+  local found=0
+  while IFS= read -r file; do
+    local rel; rel="${file#"$WORK/map/"}"
+    mkdir -p "$DEST/map/$(dirname "$rel")"
+    cp "$file" "$DEST/map/$rel" && found=$((found + 1))
+  done < <(find "$WORK/map" -type f \
+    \( -iname '*.glb' -o -iname '*.gltf' -o -iname '*.obj' -o -iname '*.mtl' \
+       -o -iname '*.bin' -o -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' \
+       -o -iname '*.ktx2' -o -iname '*.webp' \) 2>/dev/null)
+
+  # The blob may itself be a bare model with no extension for Godot to go on.
+  if [ "$found" -eq 0 ]; then
+    case "$(head -c 4 "$blob")" in
+      glTF) cp "$blob" "$DEST/map/level.glb"; found=1; echo "    bare glb, named level.glb" ;;
+      *)    echo "::warning::map holds no model Godot can import" ;;
+    esac
+  fi
+  echo "    map models staged: $found files"
+}
+
+fetch_map
+
 # --- sources ------------------------------------------------------------------
 
 # Kenney's kits, via a community mirror of kenney.nl. Every Kenney asset is CC0.
@@ -56,45 +118,47 @@ sparse_clone "https://github.com/ETdoFresh/kenney.nl.git" kenney \
 sparse_clone "https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0.git" \
   kaykit "addons"
 
+# Quaternius's Universal Animation Library: a human-proportioned rigged body per
+# animation, CC0. The adventurers are charming but chibi — this is the "real"
+# character shape an action game reads better with.
+sparse_clone "https://github.com/J-Ponzo/gltf-universal-animation-library.git" \
+  human "glTF" || echo "::warning::human character pack unavailable"
+
 # --- what the kits actually contain -------------------------------------------
 
 TOWN="$WORK/kenney/fantasy-town-kit-1.0"
 KAY="$WORK/kaykit"
 
 echo
-echo "=== town kit models (first 60) ==="
-find "$TOWN" -iname '*.glb' -printf '%f\n' 2>/dev/null | sort | head -60
-echo "=== town kit total: $(find "$TOWN" -iname '*.glb' 2>/dev/null | wc -l) ==="
+echo "=== town kit models ($(find "$TOWN" -iname '*.glb' 2>/dev/null | wc -l)) ==="
+find "$TOWN" -iname '*.glb' -printf '%f\n' 2>/dev/null | sort | paste -sd' ' -
 echo
 echo "=== character kit models ==="
-find "$KAY" \( -iname '*.glb' -o -iname '*.gltf' \) -printf '%f\n' 2>/dev/null | sort | head -40
+find "$KAY" \( -iname '*.glb' -o -iname '*.gltf' \) -printf '%f\n' 2>/dev/null | sort | paste -sd' ' -
 echo
 
-# --- buildings and streets ----------------------------------------------------
+# --- sorting the town kit ------------------------------------------------------
 #
-# Classify by name rather than guess at patterns: the first attempt matched no
-# buildings at all and shipped a city of placeholder boxes. Anything that reads
-# as scenery goes to props; everything else in the town kit is a building.
+# The kit is modular: walls, roofs and road tiles, no whole houses. The builder
+# assembles a house out of wall modules and caps it with roof modules, so those
+# two need their own categories — mixing them into one "buildings" pile is what
+# produced a town of loose panels. Road tiles are skipped: paving a 180 m grid
+# one module at a time costs thousands of draw calls on a phone.
 
-PROPS_PATTERN='barrel|crate|box|bench|lantern|lamp|sign|well|fence|cart|wagon'
-PROPS_PATTERN="$PROPS_PATTERN"'|chimney|door|window|stair|ladder|pot|plant|bush'
-PROPS_PATTERN="$PROPS_PATTERN"'|tree|rock|grass|campfire|barrier|pillar|column'
-PROPS_PATTERN="$PROPS_PATTERN"'|fountain|statue|banner|flag|awning|stall|crop|log'
-
-mkdir -p "$DEST/buildings" "$DEST/props"
-town_buildings=0
-town_props=0
+mkdir -p "$DEST/walls" "$DEST/roofs" "$DEST/props"
+walls=0; roofs=0; town_props=0; skipped=0
 
 while IFS= read -r file; do
   base="$(basename "$file" | tr '[:upper:]' '[:lower:]')"
-  if echo "$base" | grep -qE "$PROPS_PATTERN"; then
-    cp "$file" "$DEST/props/" 2>/dev/null && town_props=$((town_props + 1))
-  else
-    cp "$file" "$DEST/buildings/" 2>/dev/null && town_buildings=$((town_buildings + 1))
-  fi
+  case "$base" in
+    wall*) cp "$file" "$DEST/walls/"  && walls=$((walls + 1)) ;;
+    roof*) cp "$file" "$DEST/roofs/"  && roofs=$((roofs + 1)) ;;
+    road*) skipped=$((skipped + 1)) ;;
+    *)     cp "$file" "$DEST/props/"  && town_props=$((town_props + 1)) ;;
+  esac
 done < <(find "$TOWN" -type f -iname '*.glb' 2>/dev/null | sort)
 
-echo "    town kit split: $town_buildings buildings, $town_props props"
+echo "    town kit split: $walls walls, $roofs roofs, $town_props props, $skipped road tiles skipped"
 
 NATURE="$WORK/kenney/kenney_natureKit_2.1"
 collect "$NATURE" props "tree*.glb" 14
@@ -112,6 +176,21 @@ collect "$KAY" weapons "dagger*.gltf"
 collect "$KAY" weapons "staff*.gltf"
 collect "$KAY" weapons "*.bin"          # gltf buffers must sit beside the .gltf
 collect "$KAY" weapons "*texture*.png"
+
+HUMAN="$WORK/human"
+if [ -d "$HUMAN" ]; then
+  echo
+  echo "=== human character pack ==="
+  find "$HUMAN" \( -iname '*.glb' -o -iname '*.gltf' \) -printf '%f\n' 2>/dev/null \
+    | sort | paste -sd' ' -
+  # An idle pose is the one to stand on: the library ships a rigged body inside
+  # every clip, so any single file is a whole character.
+  collect "$HUMAN" characters "*idle*.glb" 2
+  collect "$HUMAN" characters "*Idle*.gltf" 2
+  collect "$HUMAN" characters "*walk*.glb" 1
+  collect "$HUMAN" characters "*.bin"
+  collect "$HUMAN" characters "*.png"
+fi
 
 # --- manifest -----------------------------------------------------------------
 
@@ -167,7 +246,9 @@ repository. Which kits are used is declared in `godot/assets.json`.
 CREDITS
 
 echo
-echo "=== buildings chosen (first 40) ==="
-ls "$DEST/buildings" 2>/dev/null | head -40
+echo "=== wall modules ==="
+ls "$DEST/walls" 2>/dev/null | paste -sd' ' -
+echo "=== roof modules ==="
+ls "$DEST/roofs" 2>/dev/null | paste -sd' ' -
 echo
 echo "Assets ready in $DEST"

@@ -15,6 +15,7 @@ var _target_position := Vector3.ZERO
 var _target_yaw := 0.0
 var _animation: AnimationPlayer
 var _last_position := Vector3.ZERO
+var _model: Node3D
 
 static func create(library: AssetLibrary, entry: Dictionary) -> RemotePlayer:
 	var body := RemotePlayer.new()
@@ -39,6 +40,8 @@ func _ready() -> void:
 			ModelUtils.fit_height(instance, 1.8)
 			ModelUtils.rest_on_ground(instance)
 			_animation = _find_animation_player(instance)
+			_model = instance
+			_arm(library)
 	else:
 		var mesh := MeshInstance3D.new()
 		var capsule := CapsuleMesh.new()
@@ -64,6 +67,37 @@ func _ready() -> void:
 	add_child(area)
 
 	_target_position = global_position
+
+## Puts the body somewhere without it easing back to where it was: the smoothing
+## target is set at spawn, so assigning the position alone made every agent slide
+## to the origin the moment it was placed.
+func place(where: Transform3D) -> void:
+	global_transform = where
+	_target_position = where.origin
+	_target_yaw = where.basis.get_euler().y
+	rotation.y = _target_yaw
+
+## The agent's weapon, in its hand where the rig offers one.
+func _arm(library: AssetLibrary) -> void:
+	if library == null or not library.has("weapons") or _model == null:
+		return
+	var weapon := AgentCatalog.weapon(String(agent.get("weapon", "")))
+	var scene: PackedScene = library.find("weapons", String(weapon.get("model_hint", "")))
+	if scene == null:
+		scene = library.random("weapons")
+	if scene == null:
+		return
+	var instance := scene.instantiate() as Node3D
+	if instance == null:
+		return
+
+	var hand := ModelUtils.hand_attachment(_model)
+	if hand != null:
+		hand.add_child(instance)
+	else:
+		add_child(instance)
+		instance.position = Vector3(0.28, 1.2, 0.35)
+	ModelUtils.fit_height_world(instance, 0.6)
 
 func _process(delta: float) -> void:
 	if has_meta("target_position"):
