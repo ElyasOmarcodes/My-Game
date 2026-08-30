@@ -1,7 +1,8 @@
 * text=auto
 
-*.cs text diff=csharp
-*.unity  -text merge=unityyamlmerge diff
-*.prefab -text merge=unityyamlmerge diff
-*.asset  -text merge=unityyamlmerge diff
-*.meta   -text merge=unityyamlmerge diff
+*.gd     text diff=python
+*.tscn   text
+*.godot  text
+*.glb    binary
+*.gltf   text
+*.png    binary

@@ -1,34 +1,26 @@
-# Screens
+# Screenshots
 
-Rendered at 1920x1080 — the same reference resolution the in-game `CanvasScaler`
-uses. Regenerate with `python3 tools/mockups/build_mockups.py && tools/mockups/shoot.sh`.
+These are rendered **by the game itself**, not mocked up. `scenes/Shots.tscn`
+builds the same world a match does, drives a camera to a few fixed viewpoints and
+saves a PNG at each — so what is in this folder is what the build looks like.
 
-| # | Screen | Code |
-| --- | --- | --- |
-| 01 | Splash | `Assets/Scripts/UI/Screens/SplashScreen.cs` |
-| 02 | Main menu | `MainMenuScreen.cs` |
-| 03 | Host a squad | `CreateRoomScreen.cs` |
-| 04 | Wi-Fi browser | `LanBrowserScreen.cs` |
-| 05 | Room lobby | `RoomLobbyScreen.cs` |
-| 06 | Agents | `AgentSelectScreen.cs` |
-| 07 | In-match HUD | `HudScreen.cs` |
-| 08 | Pause | `PauseScreen.cs` |
-| 09 | Results | `ResultsScreen.cs` |
-| 10 | Settings | `SettingsScreen.cs` |
-
-## World, models and the playable build
-
-Rendered by the WebGL engine in `engine/` — the same code the preview APK runs,
-so these are what the game actually looks like, not mockups.
+They are produced in CI (`.github/workflows/godot-apk.yml`) on a software
+rasteriser under `xvfb`, and committed back to the branch, because the machine
+the code is written on has no GPU and cannot reach the art kits.
 
 | File | What it shows |
 | --- | --- |
-| `3d-city-aerial.png` | The whole 460 m map and its five districts |
-| `3d-city-street.png` | Downtown avenue at dusk, agents in scale |
-| `3d-city-park.png` | Park district — pond, paths, tree cover |
-| `3d-city-industrial.png` | Warehouse and stacked shipping containers |
-| `3d-agents.png` | The four body archetypes |
-| `3d-weapons.png` | The five weapon models |
-| `3d-gameplay.png` | The playable build with its HUD and touch controls |
+| `godot-town-aerial.png` | The whole map from above |
+| `godot-town-street.png` | Standing on a spawn point at head height |
+| `godot-town-corner.png` | Buildings and props close up |
+| `godot-agents.png` | The four agents with their weapons |
+| `godot-weapons.png` | The weapon models close up |
 
-Regenerate with `tools/mockups/shoot3d.sh` and `tools/mockups/shootgame.sh`.
+To regenerate them locally:
+
+```bash
+tools/fetch_assets.sh
+godot --headless --path godot --import
+xvfb-run -a godot --path godot --rendering-method gl_compatibility \
+  --rendering-driver opengl3 res://scenes/Shots.tscn --quit-after 600
+```

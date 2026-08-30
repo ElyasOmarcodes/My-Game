@@ -1,54 +1,23 @@
-# Unity generated
-[Ll]ibrary/
-[Tt]emp/
-[Oo]bj/
-[Bb]uild/
-[Bb]uilds/
-[Ll]ogs/
-[Uu]ser[Ss]ettings/
-[Mm]emoryCaptures/
-[Rr]ecordings/
+# Godot
+.godot/
+*.translation
+
+# Fetched art — tools/fetch_assets.sh writes these at build time
+godot/assets/*
+!godot/assets/.gitkeep
 
 # Build outputs
+build/
+dist/
 *.apk
 *.aab
-*.unitypackage
-*.app
-out/
-dist/
+*.apk.idsig
 
 # IDE
-.vs/
 .vscode/
 .idea/
-*.csproj
-*.unityproj
-*.sln
-*.suo
-*.user
-*.userprefs
-*.pidb
-*.booproj
-*.svd
-*.pdb
-*.mdb
-*.opendb
-*.VC.db
+*.swp
 
 # OS
 .DS_Store
 Thumbs.db
-
-# Crashlytics / misc
-sysinfo.txt
-crashlytics-build.properties
-
-# Node (mockup tooling)
-node_modules/
-
-# Android build outputs and the engine copy Gradle stages into the app
-android/.gradle/
-android/build/
-android/app/build/
-android/local.properties
-engine-assets/
