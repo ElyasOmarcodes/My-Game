@@ -54,12 +54,12 @@ func _ready() -> void:
 
 func _build_model() -> void:
 	var library = get_meta("library", null)
-	var scene: PackedScene = null
+	var scene: Resource = null
 	if library is AssetLibrary and (library as AssetLibrary).has("throwables"):
 		scene = (library as AssetLibrary).find("throwables", "bomb")
 
 	if scene:
-		var model := scene.instantiate() as Node3D
+		var model := ModelUtils.spawn(scene)
 		if model:
 			add_child(model)
 			ModelUtils.fit_height(model, RADIUS * 2.4)
@@ -85,6 +85,7 @@ func _process(delta: float) -> void:
 func _detonate() -> void:
 	var here := global_position
 	Sfx.play_at(self, "explosion", 1.0)
+	ImpactMark.leave(get_parent(), here, Vector3.UP)
 	_flash(here)
 
 	# Only the thrower resolves damage; the host still has the last word on it.

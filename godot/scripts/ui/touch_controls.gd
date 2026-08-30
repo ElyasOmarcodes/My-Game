@@ -12,6 +12,7 @@ signal fire_pressed(down: bool)
 signal jump_pressed
 signal reload_pressed
 signal grenade_pressed
+signal swap_pressed
 signal stance_changed(stance: int)
 
 enum Stance { STAND, CROUCH, PRONE }
@@ -128,7 +129,8 @@ func _input(event: InputEvent) -> void:
 		_handle_touch(event)
 	elif event is InputEventScreenDrag:
 		_handle_drag(event)
-	elif event is InputEventMouseMotion and _look_touch == -2:
+	elif _desktop and event is InputEventMouseMotion \
+			and Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:
 		look += (event as InputEventMouseMotion).relative
 
 func _handle_touch(event: InputEventScreenTouch) -> void:
@@ -180,6 +182,9 @@ func _press(key: String, index: int) -> void:
 		"grenade":
 			grenade_pressed.emit()
 			_set_active("grenade", true)
+		"swap":
+			swap_pressed.emit()
+			_set_active("swap", true)
 		"sprint":
 			sprinting = not sprinting
 			_set_active("sprint", sprinting)
@@ -201,7 +206,7 @@ func _release(index: int) -> void:
 			"fire":
 				fire_pressed.emit(false)
 				_set_active("fire", false)
-			"jump", "reload", "grenade":
+			"jump", "reload", "grenade", "swap":
 				_set_active(key, false)
 		_pressed.erase(index)
 		return
@@ -222,20 +227,30 @@ func consume_look() -> Vector2:
 	look = Vector2.ZERO
 	return delta
 
+## Keyboard and mouse are for desktop testing only. On a phone they must stay
+## out of it entirely: a screen tap used to arrive as a left mouse click and
+## fire the weapon from anywhere on the screen.
+##
 ## Keys are read directly rather than through the input map: a hand-written map
 ## in project.godot is one typo away from breaking the whole project file.
+var _desktop := not DisplayServer.is_touchscreen_available()
+
 func move_axis() -> Vector2:
+	if not _desktop:
+		return move
 	var keys := Vector2(
 		float(Input.is_key_pressed(KEY_D)) - float(Input.is_key_pressed(KEY_A)),
 		float(Input.is_key_pressed(KEY_W)) - float(Input.is_key_pressed(KEY_S)))
 	return keys if keys.length_squared() > 0.01 else move
 
 func jump_held() -> bool:
-	return Input.is_key_pressed(KEY_SPACE)
+	return _desktop and Input.is_key_pressed(KEY_SPACE)
 
 func fire_held() -> bool:
+	if not _desktop:
+		return false
 	return Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) \
 		or Input.is_key_pressed(KEY_CTRL)
 
 func sprint_held() -> bool:
-	return sprinting or Input.is_key_pressed(KEY_SHIFT)
+	return sprinting or (_desktop and Input.is_key_pressed(KEY_SHIFT))

@@ -8,6 +8,7 @@ var _name_field: LineEdit
 var _sensitivity: HSlider
 var _map_button: Button
 var _fov: HSlider
+var _library: AssetLibrary
 
 func _ready() -> void:
 	layer = 30
@@ -35,6 +36,7 @@ func _ready() -> void:
 	column.add_child(UiTheme.spacer(8))
 
 	_build_identity(column)
+	_build_loadout(column)
 	_build_aim(column)
 	_build_map(column)
 	_build_layout(column)
@@ -66,6 +68,68 @@ func _build_identity(parent: Control) -> void:
 	_name_field.text_changed.connect(on_name)
 	_name_field.text_submitted.connect(on_name)
 	column.add_child(_name_field)
+
+# --- what you carry -----------------------------------------------------------
+
+func _build_loadout(parent: Control) -> void:
+	var column := _section(parent, "Loadout")
+	column.add_child(UiTheme.label(
+		"Two weapons go into a match: one in your hands, one across your back. "
+		+ "The swap button trades them.", UiTheme.SIZE_SMALL, UiTheme.TEXT_MID))
+
+	_library = AssetLibrary.new(0)
+	_slot_row(column, "primary", "Primary")
+	_slot_row(column, "secondary", "Sidearm")
+
+## One row per slot: the choices on the left, the model turning on the right.
+func _slot_row(parent: Control, slot: String, title: String) -> void:
+	var choices := AgentCatalog.weapons_for_slot(slot)
+	if choices.is_empty():
+		return
+
+	var chosen_id := String(Session.get_pref("loadout", slot,
+		String(choices[0].get("id", ""))))
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 18)
+	parent.add_child(row)
+
+	var list := VBoxContainer.new()
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list.add_theme_constant_override("separation", 8)
+	row.add_child(list)
+	list.add_child(UiTheme.label(title.to_upper(), UiTheme.SIZE_SMALL,
+		UiTheme.TEXT_LOW))
+
+	var preview := WeaponPreview.new(_library)
+	row.add_child(preview)
+
+	var buttons: Dictionary = {}
+	var choose := func(weapon: Dictionary) -> void:
+		Session.set_pref("loadout", slot, String(weapon.get("id", "")))
+		preview.show_weapon(weapon)
+		for id in buttons:
+			var button: Button = buttons[id]
+			var picked: bool = id == String(weapon.get("id", ""))
+			button.add_theme_stylebox_override("normal", UiTheme.fill(
+				Color(UiTheme.CYAN.r, UiTheme.CYAN.g, UiTheme.CYAN.b,
+					0.30 if picked else 0.08),
+				12, 2 if picked else 1,
+				UiTheme.CYAN if picked else UiTheme.LINE))
+
+	for weapon in choices:
+		var caption := "%s   ·   %s" % [weapon.get("name", ""),
+			weapon.get("class", "")]
+		var button := UiTheme.button(caption, UiTheme.TEXT_HI,
+			choose.bind(weapon), 62)
+		buttons[String(weapon.get("id", ""))] = button
+		list.add_child(button)
+
+	for weapon in choices:
+		if String(weapon.get("id", "")) == chosen_id:
+			choose.call(weapon)
+			return
+	choose.call(choices[0])
 
 # --- aim ----------------------------------------------------------------------
 

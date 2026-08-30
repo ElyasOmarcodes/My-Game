@@ -50,10 +50,8 @@ static func rest_on_ground(node: Node3D, ground := 0.0) -> void:
 	node.position.y = ground - bounds.position.y * node.scale.y
 
 ## Measures a scene without adding it to the tree.
-static func measure(scene: PackedScene) -> AABB:
-	if scene == null:
-		return AABB()
-	var probe := scene.instantiate() as Node3D
+static func measure(scene: Resource) -> AABB:
+	var probe := spawn(scene)
 	if probe == null:
 		return AABB()
 	var bounds := _bounds_without_tree(probe)
@@ -90,16 +88,32 @@ static func _chain(root: Node3D, leaf: Node3D) -> Transform3D:
 		walker = walker.get_parent()
 	return transform
 
+## Instances any model resource as a node.
+##
+## The kits arrive in three shapes: a .glb or .fbx imports as a PackedScene, but
+## a .obj imports as a bare Mesh with no node around it. Every caller wants a
+## Node3D, so the difference is settled once, here, rather than at each of the
+## seven places that load a model.
+static func spawn(resource: Resource) -> Node3D:
+	if resource == null:
+		return null
+	if resource is PackedScene:
+		return (resource as PackedScene).instantiate() as Node3D
+	if resource is Mesh:
+		var instance := MeshInstance3D.new()
+		instance.mesh = resource as Mesh
+		return instance
+	push_warning("[models] %s is not a model" % resource.get_class())
+	return null
+
 ## Instances a modular kit piece into a pivot that occupies exactly one grid
 ## cell: scaled so the piece is `tile` wide, centred on X and Z, resting on y=0.
 ##
 ## Kenney's modules are authored with their own origins and their own idea of a
 ## unit, so placing them on a grid by position alone leaves either gaps or
 ## overlaps. Normalising each piece into a cell removes the guesswork.
-static func module(scene: PackedScene, tile: float) -> Node3D:
-	if scene == null:
-		return null
-	var piece := scene.instantiate() as Node3D
+static func module(scene: Resource, tile: float) -> Node3D:
+	var piece := spawn(scene)
 	if piece == null:
 		return null
 

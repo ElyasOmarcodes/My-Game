@@ -12,6 +12,7 @@ const BLOCKS := 6
 const BLOCK_SIZE := 24.0
 const ROAD_WIDTH := 8.0
 const STOREY_HEIGHT := 3.2   ## what one floor should measure in world units
+const DOOR_HEIGHT := 2.2     ## how much of the door wall is actually open
 const TILE := BLOCK_SIZE + ROAD_WIDTH
 
 var spawns: Array[Transform3D] = []
@@ -73,7 +74,7 @@ func _build_supplied_map() -> bool:
 	if scene == null:
 		return false
 
-	var level := scene.instantiate() as Node3D
+	var level := ModelUtils.spawn(scene)
 	if level == null:
 		push_warning("[map] the supplied map is not a 3D scene")
 		return false
@@ -273,7 +274,7 @@ func _measure_module() -> void:
 	_measured = true
 	_cell = STOREY_HEIGHT
 
-	var wall: PackedScene = _wall_scene("wall")
+	var wall: Resource = _wall_scene("wall")
 	if wall == null:
 		return
 	var bounds := ModelUtils.measure(wall)
@@ -293,7 +294,7 @@ func _measure_module() -> void:
 		bounds.size.x, bounds.size.y, bounds.size.z, _cell, _face_yaw])
 	if _library and _library.has("roofs"):
 		for hint in ["roofFlat", "roofGable", "roof"]:
-			var roof: PackedScene = _library.find("roofs", hint.to_lower())
+			var roof: Resource = _library.find("roofs", hint.to_lower())
 			if roof:
 				var roof_bounds := ModelUtils.measure(roof)
 				print("[city] %s %.2f x %.2f x %.2f" % [hint,
@@ -301,10 +302,10 @@ func _measure_module() -> void:
 
 ## Wall modules. The kit ships a stone family and a wood one; a building picks
 ## one and keeps to it, so a house does not look like a salvage yard.
-func _wall_scene(hint: String) -> PackedScene:
+func _wall_scene(hint: String) -> Resource:
 	if _library == null or not _library.has("walls"):
 		return null
-	var scene: PackedScene = _library.find("walls", hint)
+	var scene: Resource = _library.find("walls", hint)
 	if scene == null:
 		scene = _library.find("walls", "wall")
 	return scene
@@ -349,12 +350,146 @@ func _place_building(position: Vector3, yaw: float) -> void:
 			_wall(shell, family, Vector3(half_x, y, along), 270.0, false)
 
 	_cap_roof(shell, width, depth, storeys)
+	_build_interior(shell, width, depth, storeys, door_at)
 
-	# One collider for the whole footprint: far cheaper than a body per wall.
-	var size := Vector3(width * _cell, storeys * STOREY_HEIGHT, depth * _cell)
-	ModelUtils.add_box_collider(shell, AABB(
-		Vector3(-size.x * 0.5, 0.0, -size.z * 0.5), size))
+	# A collider per wall panel, with the doorway left open.
+	#
+	# One box around the whole footprint is cheaper, but it makes every house a
+	# solid block — you cannot walk in through a door that is only painted on.
+	_wall_colliders(shell, width, depth, storeys, door_at)
 	_placed += 1
+
+## Colliders on the four walls, skipping the panel the door is in so the house
+## can be entered, and a floor at every storey.
+func _wall_colliders(shell: Node3D, width: int, depth: int, storeys: int,
+		door_at: int) -> void:
+	var height := storeys * STOREY_HEIGHT
+	var half_x := width * _cell * 0.5
+	var half_z := depth * _cell * 0.5
+	var thickness := 0.30
+
+	for x in width:
+		var along := (x - (width - 1) * 0.5) * _cell
+		if x != door_at:
+			_slab(shell, Vector3(along, height * 0.5, -half_z),
+				Vector3(_cell, height, thickness))
+		else:
+			# Above the doorway, so the wall still reads as one storey tall.
+			var lintel := height - DOOR_HEIGHT
+			if lintel > 0.05:
+				_slab(shell, Vector3(along, DOOR_HEIGHT + lintel * 0.5, -half_z),
+					Vector3(_cell, lintel, thickness))
+		_slab(shell, Vector3(along, height * 0.5, half_z),
+			Vector3(_cell, height, thickness))
+
+	for z in depth:
+		var along := (z - (depth - 1) * 0.5) * _cell
+		_slab(shell, Vector3(-half_x, height * 0.5, along),
+			Vector3(thickness, height, _cell))
+		_slab(shell, Vector3(half_x, height * 0.5, along),
+			Vector3(thickness, height, _cell))
+
+func _slab(shell: Node3D, centre: Vector3, size: Vector3) -> void:
+	var body := StaticBody3D.new()
+	body.collision_layer = 1
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = size
+	shape.shape = box
+	body.add_child(shape)
+	body.position = centre
+	shell.add_child(body)
+
+## What is inside: a floor per storey, a staircase up through them, and a hole
+## in the roof at the top of it.
+##
+## A house you can enter but not climb is half a house — the roofs are the best
+## ground in a town this flat, and a hidden stair is the way up to them.
+func _build_interior(shell: Node3D, width: int, depth: int, storeys: int,
+		door_at: int) -> void:
+	var half_x := width * _cell * 0.5
+	var half_z := depth * _cell * 0.5
+
+	# The stair runs up one corner, so it never blocks the doorway.
+	var stair_x := half_x - _cell * 0.5
+	var stair_z := half_z - _cell * 0.5
+	var hatch := Vector2(stair_x, stair_z)
+
+	for level in storeys:
+		var y := level * STOREY_HEIGHT
+		if level > 0:
+			_floor_with_hole(shell, y, width, depth, hatch)
+		_staircase(shell, Vector3(stair_x, y, stair_z))
+
+	# The roof gets the same hole, so the stair actually reaches open air.
+	_roof_hatch(shell, storeys * STOREY_HEIGHT, hatch)
+
+## A floor made of four slabs around a stairwell opening.
+func _floor_with_hole(shell: Node3D, y: float, width: int, depth: int,
+		hole: Vector2) -> void:
+	var span_x := width * _cell
+	var span_z := depth * _cell
+	var gap := _cell * 1.05
+	var left := hole.x - gap * 0.5
+	var right := hole.x + gap * 0.5
+
+	# Two bands across the full width, then two fillers beside the opening.
+	_plate(shell, Vector3(0, y, (hole.y - gap * 0.5 - span_z * 0.5) * 0.5 - 0.0),
+		Vector3(span_x, 0.24, maxf(0.1, hole.y - gap * 0.5 + span_z * 0.5)))
+	_plate(shell, Vector3(0, y, (hole.y + gap * 0.5 + span_z * 0.5) * 0.5),
+		Vector3(span_x, 0.24, maxf(0.1, span_z * 0.5 - hole.y - gap * 0.5)))
+	_plate(shell, Vector3((left - span_x * 0.5) * 0.5, y, hole.y),
+		Vector3(maxf(0.1, left + span_x * 0.5), 0.24, gap))
+	_plate(shell, Vector3((right + span_x * 0.5) * 0.5, y, hole.y),
+		Vector3(maxf(0.1, span_x * 0.5 - right), 0.24, gap))
+
+func _plate(shell: Node3D, centre: Vector3, size: Vector3) -> void:
+	if size.x <= 0.12 or size.z <= 0.12:
+		return
+	var mesh := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = size
+	mesh.mesh = box
+	mesh.position = centre
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(0.38, 0.32, 0.25)
+	material.roughness = 0.92
+	mesh.material_override = material
+	shell.add_child(mesh)
+	_slab(shell, centre, size)
+
+## A run of steps, each one its own step rather than a ramp, so the character
+## controller climbs it the way it climbs a kerb.
+func _staircase(shell: Node3D, base: Vector3) -> void:
+	var steps := 12
+	var rise := STOREY_HEIGHT / steps
+	var run := (_cell * 0.9) / steps
+
+	for i in steps:
+		var y := base.y + rise * (i + 1)
+		var z := base.z - _cell * 0.45 + run * i
+		var mesh := MeshInstance3D.new()
+		var box := BoxMesh.new()
+		box.size = Vector3(_cell * 0.8, rise, run)
+		mesh.mesh = box
+		mesh.position = Vector3(base.x, y - rise * 0.5, z)
+		var material := StandardMaterial3D.new()
+		material.albedo_color = Color(0.42, 0.36, 0.28)
+		mesh.material_override = material
+		shell.add_child(mesh)
+		_slab(shell, mesh.position, box.size)
+
+## The opening in the roof, framed so it reads as a hatch from above.
+func _roof_hatch(shell: Node3D, y: float, hole: Vector2) -> void:
+	var frame := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = Vector3(_cell * 1.1, 0.22, _cell * 1.1)
+	frame.mesh = box
+	frame.position = Vector3(hole.x, y + 0.12, hole.y)
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(0.30, 0.24, 0.18)
+	frame.material_override = material
+	shell.add_child(frame)
 
 func _wall(shell: Node3D, family: String, at: Vector3, yaw: float,
 		is_door: bool) -> void:
@@ -373,7 +508,7 @@ func _wall(shell: Node3D, family: String, at: Vector3, yaw: float,
 
 func _cap_roof(shell: Node3D, width: int, depth: int, storeys: int) -> void:
 	var top := storeys * STOREY_HEIGHT
-	var roof: PackedScene = null
+	var roof: Resource = null
 	if _library and _library.has("roofs"):
 		# A flat cap tiles across any footprint; a gable only reads right on a
 		# roof one module deep, and this town has none.
@@ -391,30 +526,43 @@ func _cap_roof(shell: Node3D, width: int, depth: int, storeys: int) -> void:
 		material.albedo_color = Color(0.35, 0.20, 0.16)
 		mesh.material_override = material
 		shell.add_child(mesh)
+		_slab(shell, mesh.position, box.size)
 		return
 
 	for x in width:
 		for z in depth:
+			# The stairwell comes up through the far corner, so that one cell is
+			# left open — a hatch you can climb out of rather than a sealed lid.
+			if x == width - 1 and z == depth - 1:
+				continue
 			var piece := ModelUtils.module(roof, _cell)
 			if piece == null:
 				continue
-			piece.position = Vector3(
+			var at := Vector3(
 				(x - (width - 1) * 0.5) * _cell, top,
 				(z - (depth - 1) * 0.5) * _cell)
+			piece.position = at
 			shell.add_child(piece)
+			# The roof is the best ground in a town this flat; it has to hold
+			# weight, so every tile gets a slab under it.
+			_slab(shell, at + Vector3(0, 0.12, 0), Vector3(_cell, 0.24, _cell))
 
 func _place_prop(hint: String, position: Vector3, yaw: float) -> void:
-	var scene: PackedScene = null
+	var scene: Resource = null
 	if _library and _library.has("props"):
 		scene = _library.find("props", hint)
 		if scene == null:
 			scene = _library.random("props")
 	if scene:
-		_instance(scene, position, yaw, false, 0.0, 2.2 if hint == "tree" else 0.9)
+		# Everything you can walk into is solid. A tree you stroll through is
+		# worse than no tree, and benches and barrels are cover in a fight.
+		var tall := hint == "tree"
+		_instance(scene, position, yaw, true, 0.0,
+			randf_range(5.0, 7.5) if tall else 0.95)
 	elif hint == "tree":
-		_primitive_block(position, Vector3(0.3, 2.4, 0.3), Color(0.10, 0.08, 0.06), false)
-		_primitive_block(position + Vector3(0, 2.0, 0), Vector3(1.8, 1.4, 1.8),
-			Color(0.09, 0.17, 0.10), false)
+		_primitive_block(position, Vector3(0.42, 4.4, 0.42), Color(0.24, 0.16, 0.10), true)
+		_primitive_block(position + Vector3(0, 3.6, 0), Vector3(3.2, 2.6, 3.2),
+			Color(0.18, 0.34, 0.16), false)
 	elif hint == "streetlight":
 		_primitive_block(position + Vector3(0, 1.8, 0), Vector3(0.12, 3.6, 0.12),
 			Color(0.13, 0.14, 0.17), false)
@@ -422,13 +570,11 @@ func _place_prop(hint: String, position: Vector3, yaw: float) -> void:
 
 ## Instances a kit piece and, when it should block movement, wraps it in a body
 ## sized to its own bounds — the kits ship visuals only, no collision.
-func _instance(scene: PackedScene, position: Vector3, yaw: float, solid: bool,
+func _instance(scene: Resource, position: Vector3, yaw: float, solid: bool,
 		fit_width := 0.0, fit_height := 0.0) -> void:
-	var node: Node = scene.instantiate()
-	if not (node is Node3D):
+	var model := ModelUtils.spawn(scene)
+	if model == null:
 		return
-
-	var model := node as Node3D
 	model.position = position
 	model.rotation.y = deg_to_rad(yaw)
 	add_child(model)
@@ -450,9 +596,18 @@ func _instance(scene: PackedScene, position: Vector3, yaw: float, solid: bool,
 	var body := StaticBody3D.new()
 	body.collision_layer = 1
 	var shape := CollisionShape3D.new()
-	var box := BoxShape3D.new()
-	box.size = bounds.size
-	shape.shape = box
+
+	# A tree's canopy is most of its bounding box, and a box that wide would
+	# fence off half the park. Tall things get a trunk-sized cylinder instead.
+	if bounds.size.y > bounds.size.x * 1.8:
+		var trunk := CylinderShape3D.new()
+		trunk.radius = maxf(0.18, minf(bounds.size.x, bounds.size.z) * 0.22)
+		trunk.height = bounds.size.y
+		shape.shape = trunk
+	else:
+		var box := BoxShape3D.new()
+		box.size = bounds.size
+		shape.shape = box
 	shape.position = bounds.get_center()
 	body.add_child(shape)
 	model.add_child(body)

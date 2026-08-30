@@ -6,6 +6,27 @@ extends Control
 ## translating. Drawing them keeps the APK free of an icon atlas and lets every
 ## glyph scale to whatever size the player drags the button to.
 
+## Filename fragments to look for in the fetched icon pack, best first. Kenney's
+## on-screen controls pack does not name things the way this game does, so each
+## button lists what it would accept rather than one exact filename.
+const WANTED := {
+	"fire":    ["shootbutton", "buttona", "circle", "target", "crosshair"],
+	"jump":    ["arrowup", "up_", "buttonb", "chevronup"],
+	"reload":  ["return", "reload", "refresh", "rotate", "buttonx"],
+	"grenade": ["bomb", "grenade", "buttony", "star"],
+	"sprint":  ["arrowright", "right_", "fast", "forward"],
+	"crouch":  ["arrowdown", "down_", "chevrondown"],
+	"prone":   ["minus", "bar", "line", "dash"],
+	"swap":    ["swap", "exchange", "switch", "arrowleftright", "shuffle"],
+}
+
+const ICON_DIRECTORY := "res://assets/icons/"
+
+static var _catalogue: PackedStringArray = PackedStringArray()
+static var _scanned := false
+
+var _texture: Texture2D
+
 var kind := "fire":
 	set(value):
 		kind = value
@@ -20,8 +41,48 @@ func _init(icon_kind := "fire", tint := Color.WHITE) -> void:
 	kind = icon_kind
 	colour = tint
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_texture = _find_texture(icon_kind)
+
+## Reads the icon folder once and keeps the listing, rather than opening the
+## directory eight times while the HUD is being built.
+static func _scan() -> void:
+	if _scanned:
+		return
+	_scanned = true
+	var folder := DirAccess.open(ICON_DIRECTORY)
+	if folder == null:
+		return
+	for file in folder.get_files():
+		var name := String(file).trim_suffix(".remap").trim_suffix(".import")
+		if name.ends_with(".png"):
+			_catalogue.append(name)
+
+## The best match in the fetched pack, or null to fall back to a drawn glyph.
+static func _find_texture(icon_kind: String) -> Texture2D:
+	_scan()
+	if _catalogue.is_empty():
+		return null
+	for fragment in WANTED.get(icon_kind, []):
+		for file in _catalogue:
+			if file.to_lower().find(String(fragment)) == -1:
+				continue
+			var path := ICON_DIRECTORY + file
+			if not ResourceLoader.exists(path):
+				continue
+			var texture := load(path)
+			if texture is Texture2D:
+				return texture
+	return null
 
 func _draw() -> void:
+	# A real icon when the pack landed; the drawn glyph is the fallback, so the
+	# buttons still read before any art has been fetched.
+	if _texture != null:
+		var side := minf(size.x, size.y) * 0.56
+		var box := Rect2((size - Vector2(side, side)) * 0.5, Vector2(side, side))
+		draw_texture_rect(_texture, box, false, colour)
+		return
+
 	var box := size
 	var mid := box * 0.5
 	var unit := minf(box.x, box.y) * 0.5      # the glyph's working radius
@@ -35,6 +96,7 @@ func _draw() -> void:
 		"crouch":   _draw_crouch(mid, unit, stroke)
 		"prone":    _draw_prone(mid, unit, stroke)
 		"sprint":   _draw_sprint(mid, unit, stroke)
+		"swap":     _draw_swap(mid, unit, stroke)
 		_:          draw_circle(mid, unit * 0.4, colour)
 
 ## Fire: a reticle, because the thing it does is put a shot where you are aiming.
@@ -101,6 +163,20 @@ func _draw_sprint(mid: Vector2, unit: float, stroke: float) -> void:
 	for i in 3:
 		var offset := Vector2(unit * (0.18 - i * 0.42), 0)
 		_chevron_right(mid + offset, unit * 0.46, stroke)
+
+## Two arrows passing each other: the weapon in hand goes to the back and the
+## one on the back comes to hand.
+func _draw_swap(mid: Vector2, unit: float, stroke: float) -> void:
+	var reach := unit * 0.66
+	draw_line(mid + Vector2(-reach, -unit * 0.3),
+		mid + Vector2(reach, -unit * 0.3), colour, stroke, true)
+	draw_line(mid + Vector2(-reach, unit * 0.3),
+		mid + Vector2(reach, unit * 0.3), colour, stroke, true)
+	_chevron_right(mid + Vector2(reach, -unit * 0.3), unit * 0.30, stroke)
+	draw_line(mid + Vector2(-reach + unit * 0.21, unit * 0.06),
+		mid + Vector2(-reach, unit * 0.3), colour, stroke, true)
+	draw_line(mid + Vector2(-reach, unit * 0.3),
+		mid + Vector2(-reach + unit * 0.21, unit * 0.54), colour, stroke, true)
 
 func _chevron(tip: Vector2, span: float, stroke: float, pointing_up: bool) -> void:
 	var drop := span if pointing_up else -span

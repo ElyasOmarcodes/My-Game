@@ -122,6 +122,7 @@ func bind(player: Player) -> void:
 	player.health_changed.connect(set_health)
 	player.ammo_changed.connect(set_ammo)
 	player.grenades_changed.connect(set_grenades)
+	player.weapon_changed.connect(set_weapon)
 
 	_agent_label.text = String(player.agent.get("name", "AGENT")).to_upper()
 	_weapon_label.text = String(player.weapon_def.get("name", "")).to_upper()
@@ -138,6 +139,9 @@ func set_health(current: float, maximum: float) -> void:
 func set_ammo(in_clip: int, reserve: int) -> void:
 	_ammo_label.text = "%d / %d" % [in_clip, reserve]
 	_ammo_label.add_theme_color_override("font_color", DANGER if in_clip == 0 else TEXT_HI)
+
+func set_weapon(weapon: Dictionary) -> void:
+	_weapon_label.text = String(weapon.get("name", "")).to_upper()
 
 func set_grenades(left: int) -> void:
 	_grenade_label.text = "GRENADES  %d" % left

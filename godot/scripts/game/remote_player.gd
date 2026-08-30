@@ -35,14 +35,16 @@ func _ready() -> void:
 	add_to_group("agents")
 
 	var library: AssetLibrary = get_meta("library")
-	var scene: PackedScene = null
+	var scene: Resource = null
 	if library and library.has("characters"):
 		scene = library.find("characters", String(agent.get("model_hint", "")))
+		if scene == null:
+			scene = library.find("characters", "soldier")
 		if scene == null:
 			scene = library.pick("characters", AgentCatalog.agent_index(agent["id"]))
 
 	if scene:
-		var instance := scene.instantiate() as Node3D
+		var instance := ModelUtils.spawn(scene)
 		if instance:
 			add_child(instance)
 			ModelUtils.fit_height(instance, 1.8)
@@ -92,6 +94,8 @@ func _arm(library: AssetLibrary) -> void:
 		return
 	_mount = WeaponMount.attach(self, library,
 		AgentCatalog.weapon(String(agent.get("weapon", ""))), _model)
+	WeaponMount.sling(self, library,
+		AgentCatalog.weapon(String(agent.get("sidearm", ""))))
 
 func _process(delta: float) -> void:
 	if has_meta("target_position"):

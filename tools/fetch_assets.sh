@@ -154,7 +154,7 @@ echo "=== kits in the mirror ($(echo "$KENNEY_DIRS" | wc -l)) ==="
 echo "$KENNEY_DIRS" | paste -sd' ' -
 echo
 
-WANTED="fantasy-town-kit-1.0 kenney_natureKit_2.1 carkit_v1.4"
+WANTED="fantasy-town-kit-1.0 kenney_natureKit_2.1 carkit_v1.4 onscreencontrols gameicons"
 
 git -C "$WORK/kenney" sparse-checkout init --cone >/dev/null
 # shellcheck disable=SC2086
@@ -262,6 +262,33 @@ collect "$KAY" throwables "smokebomb*.gltf"
 collect "$KAY" throwables "*.bin"
 collect "$KAY" throwables "*texture*.png"
 
+# --- the button icons ---------------------------------------------------------
+#
+# Drawn glyphs were readable but plainly hand-made. Kenney's on-screen controls
+# pack is CC0 art made for exactly this, so the buttons wear real icons.
+
+echo
+echo "=== on-screen control icons ==="
+for kit in onscreencontrols gameicons; do
+  [ -d "$WORK/kenney/$kit" ] || continue
+  find "$WORK/kenney/$kit" -iname '*.png' | wc -l | xargs echo "    $kit png files:"
+done
+collect "$WORK/kenney/onscreencontrols" icons "*.png"
+collect "$WORK/kenney/gameicons" icons "*.png"
+
+# --- the supplied models ------------------------------------------------------
+#
+# These came from the owner and exist nowhere the build could fetch them, so
+# they are committed. tools/prepare_assets.py is what turned 70 MB of raw
+# archives into this.
+
+if [ -d "$ROOT/assets_bundled" ]; then
+  echo
+  echo "=== supplied models ==="
+  cp -r "$ROOT/assets_bundled/." "$DEST/"
+  find "$ROOT/assets_bundled" -type f -printf '    %10s  %P\n' | sort -k2
+fi
+
 # --- sounds -------------------------------------------------------------------
 #
 # Synthesised rather than downloaded: nothing to license, nothing to keep in the
@@ -286,7 +313,7 @@ for category in sorted(os.listdir(dest)):
     models = sorted(
         "res://assets/%s/%s" % (category, name)
         for name in os.listdir(folder)
-        if name.lower().endswith((".glb", ".gltf", ".fbx"))
+        if name.lower().endswith((".glb", ".gltf", ".fbx", ".obj"))
     )
     if models:
         categories[category] = models

@@ -59,20 +59,20 @@ func paths(category: String) -> Array:
 	return _catalog.get(category, [])
 
 ## A deterministic pick, so the same seed lays out the same city everywhere.
-func pick(category: String, index: int) -> PackedScene:
+func pick(category: String, index: int) -> Resource:
 	if not has(category):
 		return null
 	var entries: Array = _catalog[category]
 	return _load(entries[abs(index) % entries.size()])
 
-func random(category: String) -> PackedScene:
+func random(category: String) -> Resource:
 	if not has(category):
 		return null
 	var entries: Array = _catalog[category]
 	return _load(entries[_rng.randi() % entries.size()])
 
 ## Finds the first model in a category whose filename contains `needle`.
-func find(category: String, needle: String) -> PackedScene:
+func find(category: String, needle: String) -> Resource:
 	var lowered := needle.to_lower()
 	for path in paths(category):
 		if path.get_file().to_lower().find(lowered) != -1:
@@ -80,13 +80,15 @@ func find(category: String, needle: String) -> PackedScene:
 	return null
 
 func instantiate(category: String, index: int) -> Node3D:
-	var scene := pick(category, index)
-	return scene.instantiate() if scene else null
+	return ModelUtils.spawn(pick(category, index))
 
-func _load(path: String) -> PackedScene:
+func _load(path: String) -> Resource:
 	if _cache.has(path):
 		return _cache[path]
-	var scene := load(path) as PackedScene
-	if scene:
-		_cache[path] = scene
-	return scene
+	# A .glb or .fbx loads as a PackedScene and a .obj as a Mesh; both are
+	# models as far as this is concerned.
+	var resource := load(path)
+	if resource is PackedScene or resource is Mesh:
+		_cache[path] = resource
+		return resource
+	return null

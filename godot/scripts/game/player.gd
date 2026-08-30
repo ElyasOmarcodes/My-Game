@@ -10,6 +10,7 @@ signal died(killer_id: String)
 signal health_changed(current: float, maximum: float)
 signal ammo_changed(in_clip: int, reserve: int)
 signal grenades_changed(left: int)
+signal weapon_changed(weapon: Dictionary)
 
 const GRAVITY := 24.0
 const JUMP_SPEED := 8.0
@@ -37,6 +38,8 @@ const GRENADE_COOLDOWN := 1.4
 
 var agent: Dictionary = {}
 var weapon_def: Dictionary = {}
+var sidearm_def: Dictionary = {}
+var holding_primary := true
 var player_id: String = ""
 var team: int = Session.Team.ALPHA
 var is_local := true
@@ -71,17 +74,24 @@ var _animation: AnimationPlayer
 var _muzzle: Node3D
 var _muzzle_flash: OmniLight3D
 var _mount: WeaponMount
+var _slung: WeaponMount
+var _stow: Dictionary = {}      ## weapon id -> [in clip, in reserve]
 var _controls: TouchControls
 var _library: AssetLibrary
 var _shape: CollisionShape3D
 var _capsule: CapsuleShape3D
+var _stance_pose: StancePose
 
 static func create(library: AssetLibrary, agent_id: String, team_value: int,
 		player_identifier: String, local: bool) -> Player:
 	var player := Player.new()
 	player._library = library
 	player.agent = AgentCatalog.agent(agent_id)
-	player.weapon_def = AgentCatalog.weapon(player.agent["weapon"])
+	# The player's own choice wins over the agent's default loadout.
+	player.weapon_def = AgentCatalog.weapon(String(Session.get_pref(
+		"loadout", "primary", player.agent.get("weapon", ""))))
+	player.sidearm_def = AgentCatalog.weapon(String(Session.get_pref(
+		"loadout", "secondary", player.agent.get("sidearm", "sidearm"))))
 	player.team = team_value
 	player.player_id = player_identifier
 	player.is_local = local
@@ -119,6 +129,7 @@ func set_controls(controls: TouchControls) -> void:
 	controls.reload_pressed.connect(reload)
 	controls.grenade_pressed.connect(throw_grenade)
 	controls.stance_changed.connect(set_stance)
+	controls.swap_pressed.connect(swap_weapon)
 
 ## Standing, crouched or prone. Changes how fast you move, how tall your hitbox
 ## is and where the camera sits.
@@ -131,20 +142,34 @@ func set_stance(value: int) -> void:
 		var rise := create_tween()
 		rise.tween_property(_spring, "position:y", float(STANCE_EYE[stance]), 0.18)
 
+	# The body actually folds. Prone additionally pitches the whole model down
+	# onto its front, which no amount of bone rotation can stand in for.
+	if _stance_pose != null:
+		_stance_pose.set_stance(stance)
+	if _model_root:
+		var lie := create_tween()
+		lie.set_parallel(true)
+		lie.tween_property(_model_root, "rotation:x",
+			deg_to_rad(-78.0) if stance == 2 else 0.0, 0.22)
+		lie.tween_property(_model_root, "position:y",
+			0.30 if stance == 2 else 0.0, 0.22)
+
 # --- construction -------------------------------------------------------------
 
 func _build_model() -> void:
 	_model_root = Node3D.new()
 	add_child(_model_root)
 
-	var scene: PackedScene = null
+	var scene: Resource = null
 	if _library and _library.has("characters"):
 		scene = _library.find("characters", String(agent.get("model_hint", "")))
+		if scene == null:
+			scene = _library.find("characters", "soldier")
 		if scene == null:
 			scene = _library.pick("characters", AgentCatalog.agent_index(agent["id"]))
 
 	if scene:
-		var instance := scene.instantiate() as Node3D
+		var instance := ModelUtils.spawn(scene)
 		if instance:
 			_model_root.add_child(instance)
 			# Kits differ wildly in scale; a KayKit adventurer is several units
@@ -152,6 +177,7 @@ func _build_model() -> void:
 			ModelUtils.fit_height(instance, 1.8)
 			ModelUtils.rest_on_ground(instance)
 			_animation = _find_animation_player(instance)
+			_stance_pose = StancePose.new(instance)
 			_tint(instance)
 	else:
 		_build_placeholder()
@@ -190,8 +216,48 @@ func _attach_weapon() -> void:
 	var model: Node3D = null
 	if _model_root.get_child_count() > 0:
 		model = _model_root.get_child(0) as Node3D
+
+	# Both weapons are carried at once: one in the hands, the other slung across
+	# the back, so a swap is instant and you can see what you are carrying.
 	_mount = WeaponMount.attach(self, _library, weapon_def, model)
 	_muzzle = _mount
+	_slung = WeaponMount.sling(self, _library, sidearm_def)
+	weapon_changed.emit(weapon_def)
+
+## Swaps the held weapon for the slung one, keeping each one's own ammunition.
+func swap_weapon() -> void:
+	if not alive or _mount == null:
+		return
+
+	_stow[String(weapon_def.get("id", ""))] = [ammo_in_clip, ammo_reserve]
+	holding_primary = not holding_primary
+	var next: Dictionary = weapon_def
+	weapon_def = sidearm_def
+	sidearm_def = next
+
+	var kept: Array = _stow.get(String(weapon_def.get("id", "")), [])
+	if kept.size() == 2:
+		ammo_in_clip = int(kept[0])
+		ammo_reserve = int(kept[1])
+	else:
+		ammo_in_clip = int(weapon_def.get("clip", 30))
+		ammo_reserve = int(weapon_def.get("reserve", 150))
+
+	_mount.queue_free()
+	if _slung != null:
+		_slung.queue_free()
+
+	var model: Node3D = null
+	if _model_root.get_child_count() > 0:
+		model = _model_root.get_child(0) as Node3D
+	_mount = WeaponMount.attach(self, _library, weapon_def, model)
+	_muzzle = _mount
+	_slung = WeaponMount.sling(self, _library, sidearm_def)
+
+	_next_shot_at = Time.get_ticks_msec() / 1000.0 + 0.35
+	_reload_until = 0.0
+	ammo_changed.emit(ammo_in_clip, ammo_reserve)
+	weapon_changed.emit(weapon_def)
 
 func _tint(node: Node) -> void:
 	# Team colour on the imported model, applied as an overlay so the kit's own
@@ -249,6 +315,8 @@ func _physics_process(delta: float) -> void:
 	_stride += planar * delta * 2.4
 	_drive_animation(planar)
 	_carry_weapon()
+	if _stance_pose != null:
+		_stance_pose.advance(delta)
 
 func _carry_weapon() -> void:
 	if _mount != null:
@@ -361,18 +429,21 @@ func fire() -> void:
 	ammo_in_clip -= 1
 	ammo_changed.emit(ammo_in_clip, ammo_reserve)
 
-	var origin := _eye_position()
+	# Where the shot is *aimed* from is the camera, so the crosshair means what
+	# it says. Where it is *drawn* from is the barrel — starting the tracer at
+	# the camera drew it out of the player's back and past their own shoulder.
+	var eye := _eye_position()
 	var direction := _aim_direction()
 	var reach := float(weapon_def.get("range", 100.0))
 
 	var space := get_world_3d().direct_space_state
-	var query := PhysicsRayQueryParameters3D.create(origin, origin + direction * reach)
+	var query := PhysicsRayQueryParameters3D.create(eye, eye + direction * reach)
 	query.exclude = [get_rid()]
 	query.collision_mask = 1 | 2
 
 	var hit: Dictionary = space.intersect_ray(query)
 	var landed: Vector3 = hit["position"] if hit.has("position") else \
-		origin + direction * reach
+		eye + direction * reach
 
 	if hit.has("collider"):
 		# The body a shot lands on is rarely the agent node itself — a remote
@@ -383,7 +454,10 @@ func fire() -> void:
 			var victim_id := String(victim.get("player_id"))
 			if victim_id != "" and victim_id != player_id:
 				NetGame.report_hit(victim_id, float(weapon_def.get("damage", 20.0)))
+		elif hit.has("normal"):
+			ImpactMark.leave(get_parent(), landed, hit["normal"])
 
+	var origin: Vector3 = _mount.barrel() if _mount != null else eye
 	_report_shot(origin, landed)
 	_kick()
 

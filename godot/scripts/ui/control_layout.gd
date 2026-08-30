@@ -17,6 +17,7 @@ const DEFAULTS := {
 	"sprint":  {"x": 0.575, "y": 0.640, "r": 64.0},
 	"crouch":  {"x": 0.575, "y": 0.870, "r": 66.0},
 	"prone":   {"x": 0.468, "y": 0.905, "r": 66.0},
+	"swap":    {"x": 0.700, "y": 0.360, "r": 66.0},
 }
 
 const ACCENTS := {
@@ -27,11 +28,13 @@ const ACCENTS := {
 	"sprint":  Color("#3BE8FF"),
 	"crouch":  Color("#B58CFF"),
 	"prone":   Color("#B58CFF"),
+	"swap":    Color("#FFB23B"),
 }
 
 ## The order buttons are drawn and hit-tested in. Later entries win a tie, so
 ## the big fire button is listed first and the small ones can overlap its edge.
-const ORDER := ["fire", "jump", "reload", "grenade", "sprint", "crouch", "prone"]
+const ORDER := ["fire", "jump", "reload", "grenade", "sprint", "crouch",
+	"prone", "swap"]
 
 static func load_saved() -> Dictionary:
 	var layout: Dictionary = {}

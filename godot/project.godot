@@ -18,6 +18,13 @@ config/icon="res://icon.svg"
 boot_splash/bg_color=Color(0.02, 0.027, 0.047, 1)
 boot_splash/show_image=false
 
+[input_devices]
+
+; Godot turns every screen touch into a left mouse click by default, and the
+; fire button reads the left mouse button for desktop testing — so a tap
+; anywhere on the screen fired the weapon. Touch is touch; a mouse is a mouse.
+pointing/emulate_mouse_from_touch=false
+
 [filesystem]
 
 ; The supplied map arrives as FBX. Godot 4.3 reads it with ufbx and needs no
