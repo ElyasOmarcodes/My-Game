@@ -18,7 +18,7 @@ var _hand: BoneAttachment3D
 static func attach(agent: Node3D, library: AssetLibrary, weapon: Dictionary,
 		model: Node3D) -> WeaponMount:
 	var mount := WeaponMount.new()
-	mount.position = Vector3(0.26, 1.22, 0.30)
+	mount.position = Vector3(0.26, 1.15, 0.22)
 	agent.add_child(mount)
 	mount._arm(library, weapon, model)
 	return mount
@@ -61,14 +61,18 @@ func _build_placeholder(weapon: Dictionary) -> void:
 	mesh.material_override = material
 	add_child(mesh)
 
-## A tint over the kit's own shading, not a coat of paint over it.
+## The gun bodies come out of the kit untextured white, so the weapon's colour
+## has to replace the material rather than glaze over it — an overlay on white
+## just reads as white. Kept metallic, so the shape still catches the light.
 func _paint(node: Node, tint: Color) -> void:
 	for child in node.get_children():
 		if child is MeshInstance3D:
-			var overlay := StandardMaterial3D.new()
-			overlay.albedo_color = Color(tint.r, tint.g, tint.b, 0.24)
-			overlay.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-			(child as MeshInstance3D).material_overlay = overlay
+			var material := StandardMaterial3D.new()
+			material.albedo_color = tint
+			material.metallic = 0.55
+			material.metallic_specular = 0.6
+			material.roughness = 0.38
+			(child as MeshInstance3D).material_override = material
 		_paint(child, tint)
 
 ## Call once a frame from the agent that owns it.
