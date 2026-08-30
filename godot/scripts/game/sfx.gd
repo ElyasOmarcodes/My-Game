@@ -13,24 +13,27 @@ const VOICES := ["rifle", "smg", "shotgun", "sniper", "pistol", "explosion",
 var _clips: Dictionary = {}            # name -> AudioStream
 
 func _ready() -> void:
-	for name in VOICES:
-		var path := DIRECTORY + name + ".wav"
-		if ResourceLoader.exists(path):
-			var clip := load(path)
-			if clip is AudioStream:
-				_clips[name] = clip
+	for voice in VOICES:
+		# Both of these come back as Variant — a const array's element and
+		# load()'s return — and := cannot infer a type from one.
+		var path: String = DIRECTORY + String(voice) + ".wav"
+		if not ResourceLoader.exists(path):
+			continue
+		var clip: Resource = load(path)
+		if clip is AudioStream:
+			_clips[String(voice)] = clip
 	print("[sfx] %d of %d clips loaded" % [_clips.size(), VOICES.size()])
 
-func has(name: String) -> bool:
-	return _clips.has(name)
+func has(clip_name: String) -> bool:
+	return _clips.has(clip_name)
 
 ## Plays a clip in the world, so distance and direction are audible. The player
 ## is freed once the clip finishes, which keeps rapid fire from piling up nodes.
-func play_at(where: Node3D, name: String, volume := 1.0, pitch := 1.0) -> void:
-	if not _clips.has(name) or where == null or not where.is_inside_tree():
+func play_at(where: Node3D, clip_name: String, volume := 1.0, pitch := 1.0) -> void:
+	if not _clips.has(clip_name) or where == null or not where.is_inside_tree():
 		return
 	var player := AudioStreamPlayer3D.new()
-	player.stream = _clips[name]
+	player.stream = _clips[clip_name]
 	player.unit_size = 14.0
 	player.max_distance = 140.0
 	player.volume_db = linear_to_db(clampf(volume, 0.01, 4.0))
@@ -49,11 +52,11 @@ func play_at(where: Node3D, name: String, volume := 1.0, pitch := 1.0) -> void:
 
 ## Plays without a position — for the local player's own weapon, which should
 ## sound the same wherever they are standing.
-func play(name: String, volume := 1.0, pitch := 1.0) -> void:
-	if not _clips.has(name):
+func play(clip_name: String, volume := 1.0, pitch := 1.0) -> void:
+	if not _clips.has(clip_name):
 		return
 	var player := AudioStreamPlayer.new()
-	player.stream = _clips[name]
+	player.stream = _clips[clip_name]
 	player.volume_db = linear_to_db(clampf(volume, 0.01, 4.0))
 	player.pitch_scale = pitch
 	add_child(player)

@@ -134,7 +134,7 @@ func _choose_agent(agent_id: String) -> void:
 	for id in _agent_cards:
 		var entry := AgentCatalog.agent(id)
 		var accent: Color = entry.get("accent", UiTheme.CYAN)
-		var chosen := id == agent_id
+		var chosen: bool = id == agent_id
 		var card: PanelContainer = _agent_cards[id]
 		card.add_theme_stylebox_override("panel", UiTheme.fill(
 			Color(accent.r, accent.g, accent.b, 0.22 if chosen else 0.06),
