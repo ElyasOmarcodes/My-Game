@@ -259,7 +259,10 @@ jobs:
             **Install:** download the `.apk`, open it, allow "install unknown
             apps" when asked. Signed with the Android debug key.
 
-            - Free-roam town built from CC0 kits by Kenney and Kay Lousberg
-            - Four rigged agents with their own weapons
+            - Free-roam town assembled from Kenney's CC0 Fantasy Town and
+              Nature kits, with props and weapons from KayKit (CC0)
+            - Four agents on a realistic rigged body — three.js's Soldier, a
+              Mixamo rig, which is the one thing here that is not CC0. See
+              `godot/assets/CREDITS.md`.
             - Wi-Fi squads: **Host a squad**, and other phones on the same
               network see it in the list automatically (UDP 47777)
