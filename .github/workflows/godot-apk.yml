@@ -113,30 +113,8 @@ jobs:
             exit 1
           fi
 
-          # Per category, because a total on its own hides the failure that has
-          # slipped through twice: the count passes on props while the walls the
-          # town is actually built from never landed.
-          python3 - <<'CHECK'
-import json, sys
-
-catalog = json.load(open("godot/assets/manifest.json"))["categories"]
-required = {"walls": 5, "roofs": 3, "props": 20, "characters": 3, "weapons": 3}
-missing = []
-for category, minimum in required.items():
-    found = len(catalog.get(category, []))
-    print("  %-12s %3d  (need %d)" % (category, found, minimum))
-    if found < minimum:
-        missing.append("%s: %d < %d" % (category, found, minimum))
-
-supplied_map = len(catalog.get("map", []))
-print("  %-12s %3d  (optional)" % ("map", supplied_map))
-if not supplied_map:
-    print("::warning::no supplied map landed — the town will be generated")
-
-if missing:
-    print("::error::art categories short: " + "; ".join(missing))
-    sys.exit(1)
-CHECK
+          # Per category: a total hides a category that came back empty.
+          python3 tools/check_assets.py
 
       - name: Import the project
         run: |

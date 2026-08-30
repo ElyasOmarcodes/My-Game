@@ -1,0 +1,39 @@
+#!/usr/bin/env python3
+"""Fails the build when an art category came back short.
+
+A total on its own hides the failure this has hit twice: 195 models pass the
+count while the walls the town is actually built from never landed, and the game
+quietly falls back to grey boxes. Every category the world needs is checked on
+its own.
+"""
+import json
+import sys
+
+REQUIRED = {"walls": 5, "roofs": 3, "props": 20, "characters": 3, "weapons": 3}
+MANIFEST = "godot/assets/manifest.json"
+
+
+def main() -> int:
+    catalog = json.load(open(MANIFEST))["categories"]
+
+    short = []
+    for category, minimum in sorted(REQUIRED.items()):
+        found = len(catalog.get(category, []))
+        print("  %-12s %3d  (need %d)" % (category, found, minimum))
+        if found < minimum:
+            short.append("%s %d<%d" % (category, found, minimum))
+
+    # The supplied map is optional: without one the town is generated instead.
+    supplied = len(catalog.get("map", []))
+    print("  %-12s %3d  (optional)" % ("map", supplied))
+    if not supplied:
+        print("::warning::no supplied map landed - the town will be generated")
+
+    if short:
+        print("::error::art categories short: " + "; ".join(short))
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
