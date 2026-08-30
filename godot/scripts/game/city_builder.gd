@@ -257,6 +257,7 @@ func _build_park(centre: Vector3) -> void:
 ## house is assembled from those pieces on a grid whose cell size comes from the
 ## wall module itself.
 var _cell := 0.0        ## world size of one module cell
+var _face_yaw := 0.0    ## turn that makes a wall module face -Z
 var _measured := false
 
 func _measure_module() -> void:
@@ -269,15 +270,30 @@ func _measure_module() -> void:
 	if wall == null:
 		return
 	var bounds := ModelUtils.measure(wall)
-	if bounds.size.x <= 0.001 or bounds.size.y <= 0.001:
+	var width := maxf(bounds.size.x, bounds.size.z)
+	if width <= 0.001 or bounds.size.y <= 0.001:
 		return
 
-	# A wall module is one storey tall by construction, so sizing the cell by the
-	# module's own aspect ratio makes a storey a storey however the kit is drawn.
-	_cell = clampf(STOREY_HEIGHT * bounds.size.x / bounds.size.y, 1.5, 6.0)
-	print("[city] wall module %.2f x %.2f -> cell %.2f" % [bounds.size.x, bounds.size.y, _cell])
+	# A wall module is one storey tall by construction, so sizing the cell from
+	# the module's own aspect ratio makes a storey a storey however it is drawn.
+	_cell = clampf(STOREY_HEIGHT * width / bounds.size.y, 1.0, 8.0)
 
-## Wall modules, preferring a plain one over an arch or a broken ruin.
+	# Which way it faces is the kit's business, not ours: this one is thin along
+	# X, so it needs a quarter turn before its face points down -Z.
+	_face_yaw = 90.0 if bounds.size.x < bounds.size.z else 0.0
+
+	print("[city] wall %.2f x %.2f x %.2f -> cell %.2f, face yaw %.0f" % [
+		bounds.size.x, bounds.size.y, bounds.size.z, _cell, _face_yaw])
+	if _library and _library.has("roofs"):
+		for hint in ["roofFlat", "roofGable", "roof"]:
+			var roof: PackedScene = _library.find("roofs", hint.to_lower())
+			if roof:
+				var roof_bounds := ModelUtils.measure(roof)
+				print("[city] %s %.2f x %.2f x %.2f" % [hint,
+					roof_bounds.size.x, roof_bounds.size.y, roof_bounds.size.z])
+
+## Wall modules. The kit ships a stone family and a wood one; a building picks
+## one and keeps to it, so a house does not look like a salvage yard.
 func _wall_scene(hint: String) -> PackedScene:
 	if _library == null or not _library.has("walls"):
 		return null
@@ -297,9 +313,10 @@ func _place_building(position: Vector3, yaw: float) -> void:
 		_placed += 1
 		return
 
-	var width := _rng.randi_range(3, 5)
-	var depth := _rng.randi_range(3, 4)
+	var width := _rng.randi_range(2, 4)
+	var depth := _rng.randi_range(2, 3)
 	var storeys := _rng.randi_range(1, 3)
+	var family := "wallWood" if _rng.randf() < 0.45 else "wall"
 
 	var shell := Node3D.new()
 	shell.position = position
@@ -316,13 +333,13 @@ func _place_building(position: Vector3, yaw: float) -> void:
 		# on the cells the corners never meet and the house reads as loose panels.
 		for x in width:
 			var along := (x - (width - 1) * 0.5) * _cell
-			_wall(shell, Vector3(along, y, -half_z), 0.0,
+			_wall(shell, family, Vector3(along, y, -half_z), 0.0,
 				level == 0 and x == door_at)
-			_wall(shell, Vector3(along, y, half_z), 180.0, false)
+			_wall(shell, family, Vector3(along, y, half_z), 180.0, false)
 		for z in depth:
 			var along := (z - (depth - 1) * 0.5) * _cell
-			_wall(shell, Vector3(-half_x, y, along), 90.0, false)
-			_wall(shell, Vector3(half_x, y, along), 270.0, false)
+			_wall(shell, family, Vector3(-half_x, y, along), 90.0, false)
+			_wall(shell, family, Vector3(half_x, y, along), 270.0, false)
 
 	_cap_roof(shell, width, depth, storeys)
 
@@ -332,18 +349,19 @@ func _place_building(position: Vector3, yaw: float) -> void:
 		Vector3(-size.x * 0.5, 0.0, -size.z * 0.5), size))
 	_placed += 1
 
-func _wall(shell: Node3D, at: Vector3, yaw: float, is_door: bool) -> void:
-	var hint := "wall"
+func _wall(shell: Node3D, family: String, at: Vector3, yaw: float,
+		is_door: bool) -> void:
+	var hint := family
 	if is_door:
-		hint = "door"
+		hint = family + "Door"
 	elif _rng.randf() < 0.4:
-		hint = "window"
+		hint = family + "Window"
 
-	var piece := ModelUtils.module(_wall_scene(hint), _cell)
+	var piece := ModelUtils.module(_wall_scene(hint.to_lower()), _cell)
 	if piece == null:
 		return
 	piece.position = at
-	piece.rotation.y = deg_to_rad(yaw)
+	piece.rotation.y = deg_to_rad(yaw + _face_yaw)
 	shell.add_child(piece)
 
 func _cap_roof(shell: Node3D, width: int, depth: int, storeys: int) -> void:

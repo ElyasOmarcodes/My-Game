@@ -106,9 +106,13 @@ static func module(scene: PackedScene, tile: float) -> Node3D:
 	var pivot := Node3D.new()
 	pivot.add_child(piece)
 
+	# By the widest horizontal side, not by X: the town kit's wall lies in the YZ
+	# plane (0.10 x 1.00 x 1.00), so fitting X to the cell scaled it fifteenfold
+	# and turned a cottage into a tower block.
 	var bounds := _bounds_without_tree(piece)
-	if bounds.size.x > 0.0001:
-		var factor := tile / bounds.size.x
+	var widest := maxf(bounds.size.x, bounds.size.z)
+	if widest > 0.0001:
+		var factor := tile / widest
 		piece.scale = Vector3.ONE * factor
 		bounds = AABB(bounds.position * factor, bounds.size * factor)
 
@@ -125,6 +129,7 @@ static func hand_attachment(model: Node3D, right := true) -> BoneAttachment3D:
 		if skeleton == null:
 			continue
 		var chosen := -1
+		var chosen_length := 9999
 		for i in skeleton.get_bone_count():
 			var bone := skeleton.get_bone_name(i).to_lower()
 			if bone.find("hand") == -1:
@@ -133,9 +138,15 @@ static func hand_attachment(model: Node3D, right := true) -> BoneAttachment3D:
 				or bone.find(".r") != -1 or bone.find("_r") != -1
 			if is_right != right:
 				continue
-			chosen = i
+			# A Mixamo rig names every finger joint RightHandThumb1 and so on, so
+			# the shortest name is the wrist — the one a weapon belongs in. A rig
+			# that offers an explicit slot wins outright.
 			if bone.find("slot") != -1:
-				break                      # a rig that offers a slot means it
+				chosen = i
+				break
+			if bone.length() < chosen_length:
+				chosen = i
+				chosen_length = bone.length()
 		if chosen < 0:
 			continue
 		var attachment := BoneAttachment3D.new()

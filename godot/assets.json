@@ -4,30 +4,51 @@
     "_comment": "A ready-made level. When this downloads and contains a model the game uses it as the world; otherwise it assembles a town from the kit modules below.",
     "name": "Supplied map",
     "url": "https://cdn.z-s.workers.dev/d0cb74f2-627d-4acc-bf83-4cf5cbf5c7c9",
-    "supplied_by": "repository owner"
+    "supplied_by": "repository owner",
+    "status": "the URL returned an error on the build runner too; replace it with a working direct-download link"
   },
   "sources": [
     {
       "name": "Kenney kits",
       "url": "https://github.com/ETdoFresh/kenney.nl.git",
-      "folders": ["fantasy-town-kit-1.0", "kenney_natureKit_2.1", "carkit_v1.4"],
+      "folders": [
+        "fantasy-town-kit-1.0",
+        "kenney_natureKit_2.1",
+        "carkit_v1.4"
+      ],
       "author": "Kenney",
       "licence": "CC0-1.0"
     },
     {
       "name": "KayKit Adventurers",
       "url": "https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0.git",
-      "folders": ["addons"],
+      "folders": [
+        "addons"
+      ],
       "author": "Kay Lousberg",
       "licence": "CC0-1.0"
     },
     {
       "name": "Quaternius Universal Animation Library",
       "url": "https://github.com/J-Ponzo/gltf-universal-animation-library.git",
-      "folders": ["glTF"],
+      "folders": [
+        "glTF"
+      ],
       "author": "Quaternius",
       "licence": "CC0-1.0",
       "why": "Human-proportioned rigged bodies with idle/walk/run, rather than the chibi adventurers"
+    },
+    {
+      "name": "Realistic character bodies",
+      "url": "https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/",
+      "files": [
+        "Soldier.glb",
+        "Xbot.glb"
+      ],
+      "author": "Mixamo (Adobe), distributed with three.js",
+      "licence": "three.js is MIT; the Mixamo rigs inside it are not CC0",
+      "why": "A real human body with Idle/Walk/Run, rather than the chibi adventurers",
+      "to_stay_all_cc0": "Delete this entry — the game falls back to the CC0 adventurers."
     }
   ],
   "categories": {

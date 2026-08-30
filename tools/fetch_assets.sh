@@ -118,11 +118,25 @@ sparse_clone "https://github.com/ETdoFresh/kenney.nl.git" kenney \
 sparse_clone "https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0.git" \
   kaykit "addons"
 
-# Quaternius's Universal Animation Library: a human-proportioned rigged body per
-# animation, CC0. The adventurers are charming but chibi — this is the "real"
-# character shape an action game reads better with.
-sparse_clone "https://github.com/J-Ponzo/gltf-universal-animation-library.git" \
-  human "glTF" || echo "::warning::human character pack unavailable"
+# A realistic rigged body. The adventurers are charming but chibi, and the
+# animation library turned out to ship clips with no mesh at all, so these come
+# down as single files rather than as a repository.
+fetch_model() {
+  local url="$1" name="$2"
+  if curl -fsSL --retry 3 --retry-delay 2 -o "$DEST/characters/$name" "$url"; then
+    echo "    characters  +1  ($name)"
+  else
+    echo "::warning::could not fetch $name"
+  fi
+}
+
+mkdir -p "$DEST/characters"
+fetch_model \
+  "https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/Soldier.glb" \
+  "Soldier.glb"
+fetch_model \
+  "https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/Xbot.glb" \
+  "Xbot.glb"
 
 # --- what the kits actually contain -------------------------------------------
 
@@ -177,21 +191,6 @@ collect "$KAY" weapons "staff*.gltf"
 collect "$KAY" weapons "*.bin"          # gltf buffers must sit beside the .gltf
 collect "$KAY" weapons "*texture*.png"
 
-HUMAN="$WORK/human"
-if [ -d "$HUMAN" ]; then
-  echo
-  echo "=== human character pack ==="
-  find "$HUMAN" \( -iname '*.glb' -o -iname '*.gltf' \) -printf '%f\n' 2>/dev/null \
-    | sort | paste -sd' ' -
-  # An idle pose is the one to stand on: the library ships a rigged body inside
-  # every clip, so any single file is a whole character.
-  collect "$HUMAN" characters "*idle*.glb" 2
-  collect "$HUMAN" characters "*Idle*.gltf" 2
-  collect "$HUMAN" characters "*walk*.glb" 1
-  collect "$HUMAN" characters "*.bin"
-  collect "$HUMAN" characters "*.png"
-fi
-
 # --- manifest -----------------------------------------------------------------
 
 python3 - "$DEST" "$CONFIG" <<'PY'
@@ -240,6 +239,13 @@ here anyway, because these artists made the game look like a game.
 | Nature Kit | Kenney | kenney.nl | CC0 1.0 |
 | Car Kit | Kenney | kenney.nl | CC0 1.0 |
 | Adventurers Character Pack | Kay Lousberg | kaylousberg.com | CC0 1.0 |
+| Soldier.glb, Xbot.glb | Mixamo (Adobe) | three.js examples, MIT repository | see below |
+
+The two realistic bodies come from the three.js examples folder. three.js itself
+is MIT; the characters inside it are Mixamo rigs, whose terms allow use in a
+project but are not CC0. Everything else here is public domain. To keep the
+whole build CC0, remove those two entries from `godot/assets.json` — the game
+falls back to the CC0 adventurers on its own.
 
 Fetched at build time by `tools/fetch_assets.sh`; not committed to this
 repository. Which kits are used is declared in `godot/assets.json`.
