@@ -70,6 +70,7 @@ var _model_root: Node3D
 var _animation: AnimationPlayer
 var _muzzle: Node3D
 var _muzzle_flash: OmniLight3D
+var _hand: BoneAttachment3D
 var _controls: TouchControls
 var _library: AssetLibrary
 var _shape: CollisionShape3D
@@ -198,14 +199,13 @@ func _attach_weapon() -> void:
 	if scene:
 		var instance := scene.instantiate() as Node3D
 		if instance:
-			# In the hand when the rig offers one, at the hip when it does not.
-			var hand: BoneAttachment3D = null
+			# The gun rides the hand's position but keeps the body's heading.
+			# Parenting it to the bone as well inherits the bone's rotation, and
+			# an idle arm hangs down — which is why the last build's agents held
+			# their rifles sideways across their hips.
 			if _model_root.get_child_count() > 0:
-				hand = ModelUtils.hand_attachment(_model_root.get_child(0) as Node3D)
-			if hand != null:
-				hand.add_child(instance)
-			else:
-				_muzzle.add_child(instance)
+				_hand = ModelUtils.hand_attachment(_model_root.get_child(0) as Node3D)
+			_muzzle.add_child(instance)
 			# Two gun bodies carry five weapons, so size and colour are what
 			# separate a sidearm from a marksman rifle at a glance.
 			ModelUtils.fit_length_world(instance,
@@ -221,7 +221,7 @@ func _paint_weapon(node: Node, tint: Color) -> void:
 	for child in node.get_children():
 		if child is MeshInstance3D:
 			var overlay := StandardMaterial3D.new()
-			overlay.albedo_color = Color(tint.r, tint.g, tint.b, 0.55)
+			overlay.albedo_color = Color(tint.r, tint.g, tint.b, 0.24)
 			overlay.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 			(child as MeshInstance3D).material_overlay = overlay
 		_paint_weapon(child, tint)
@@ -281,6 +281,16 @@ func _physics_process(delta: float) -> void:
 	var planar := Vector2(velocity.x, velocity.z).length()
 	_stride += planar * delta * 2.4
 	_drive_animation(planar)
+	_carry_weapon()
+
+## Keeps the weapon in the hand as the animation moves it, while it goes on
+## pointing where the agent is facing.
+func _carry_weapon() -> void:
+	if _muzzle == null:
+		return
+	if _hand != null and is_instance_valid(_hand):
+		_muzzle.global_position = _hand.global_position
+	_muzzle.global_rotation = Vector3(0.0, global_rotation.y, 0.0)
 
 ## Aim, smoothed. A raw touch drag arrives in coarse jumps, and feeding those
 ## straight into the camera is what makes a phone shooter feel cheap; easing
