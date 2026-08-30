@@ -33,38 +33,50 @@ const AGENTS := [
 	},
 ]
 
+## Five weapons from two gun bodies.
+##
+## Kenney's FPS kit is the only free 3D gun pack this build can reach, and it
+## ships a blaster and a repeater. Rather than hand four agents the same model,
+## each weapon takes a silhouette, a size, a colour and a voice of its own —
+## which is what tells them apart in a fight anyway.
 const WEAPONS := [
 	{
 		"id": "carbine", "name": "MK-7 Carbine", "class": "Assault rifle",
 		"damage": 20.0, "rate": 8.5, "spread": 0.014, "clip": 30, "reserve": 180,
 		"reload": 1.7, "range": 120.0, "kick": 1.15,
-		"model_hint": "blasterD", "voice": "rifle",
+		"model_hint": "blaster.glb", "model_size": 0.62,
+		"tint": Color("#9FB9CC"), "voice": "blaster",
 	},
 	{
 		"id": "smg", "name": "Wasp SMG", "class": "Submachine gun",
 		"damage": 20.0, "rate": 13.0, "spread": 0.028, "clip": 35, "reserve": 210,
 		"reload": 1.4, "range": 62.0, "kick": 0.85,
-		"model_hint": "blasterE", "voice": "smg",
+		"model_hint": "blaster-repeater", "model_size": 0.50,
+		"tint": Color("#B58CFF"), "voice": "blaster_repeater",
 	},
 	{
 		"id": "shotgun", "name": "Breaker 12", "class": "Shotgun",
 		"damage": 20.0, "rate": 1.9, "spread": 0.070, "clip": 8, "reserve": 56,
 		"reload": 2.6, "range": 28.0, "kick": 3.1,
-		"model_hint": "blasterB", "voice": "shotgun",
+		"model_hint": "blaster-repeater", "model_size": 0.78,
+		"tint": Color("#C0763C"), "voice": "shotgun",
 	},
 	{
 		"id": "sniper", "name": "Longshot", "class": "Marksman rifle",
 		"damage": 50.0, "rate": 1.1, "spread": 0.002, "clip": 6, "reserve": 36,
 		"reload": 2.4, "range": 260.0, "kick": 3.6,
-		"model_hint": "blasterK", "voice": "sniper",
+		"model_hint": "blaster.glb", "model_size": 0.92,
+		"tint": Color("#3E4A57"), "voice": "sniper",
 	},
 	{
 		"id": "sidearm", "name": "Vex 9", "class": "Sidearm",
 		"damage": 20.0, "rate": 5.5, "spread": 0.020, "clip": 15, "reserve": 90,
 		"reload": 1.2, "range": 48.0, "kick": 1.0,
-		"model_hint": "blasterA", "voice": "pistol",
+		"model_hint": "blaster.glb", "model_size": 0.38,
+		"tint": Color("#D8D2C4"), "voice": "pistol",
 	},
 ]
+
 
 static func agent(id: String) -> Dictionary:
 	for entry in AGENTS:

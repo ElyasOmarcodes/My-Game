@@ -7,22 +7,30 @@ extends Node
 ## missing.
 
 const DIRECTORY := "res://assets/audio/"
-const VOICES := ["rifle", "smg", "shotgun", "sniper", "pistol", "explosion",
-	"reload", "empty"]
 
 var _clips: Dictionary = {}            # name -> AudioStream
 
+## Scans the audio folder rather than naming files, so a recording that the
+## build fetched and one this project synthesised are picked up the same way.
 func _ready() -> void:
-	for voice in VOICES:
-		# Both of these come back as Variant — a const array's element and
-		# load()'s return — and := cannot infer a type from one.
-		var path: String = DIRECTORY + String(voice) + ".wav"
+	var folder := DirAccess.open(DIRECTORY)
+	if folder == null:
+		print("[sfx] no audio folder — the game runs silent")
+		return
+
+	for file in folder.get_files():
+		var name := String(file).trim_suffix(".remap").trim_suffix(".import")
+		if not (name.ends_with(".wav") or name.ends_with(".ogg")):
+			continue
+		var path := DIRECTORY + name
 		if not ResourceLoader.exists(path):
 			continue
 		var clip: Resource = load(path)
 		if clip is AudioStream:
-			_clips[String(voice)] = clip
-	print("[sfx] %d of %d clips loaded" % [_clips.size(), VOICES.size()])
+			_clips[name.get_basename()] = clip
+
+	print("[sfx] %d clips: %s" % [_clips.size(),
+		", ".join(PackedStringArray(_clips.keys()))])
 
 func has(clip_name: String) -> bool:
 	return _clips.has(clip_name)

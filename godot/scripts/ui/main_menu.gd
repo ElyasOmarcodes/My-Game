@@ -109,8 +109,12 @@ func _agent_card(entry: Dictionary) -> PanelContainer:
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 2)
 	card.add_child(column)
-	column.add_child(UiTheme.label(String(entry["name"]).to_upper(),
-		UiTheme.SIZE_BODY, accent, HORIZONTAL_ALIGNMENT_CENTER))
+	# No wrapping: "VANGUARD" broke across two lines on a four-card row.
+	var title := UiTheme.label(String(entry["name"]).to_upper(),
+		UiTheme.SIZE_SMALL + 2, accent, HORIZONTAL_ALIGNMENT_CENTER)
+	title.autowrap_mode = TextServer.AUTOWRAP_OFF
+	title.clip_text = true
+	column.add_child(title)
 	column.add_child(UiTheme.label(String(entry["role"]), UiTheme.SIZE_SMALL,
 		UiTheme.TEXT_MID, HORIZONTAL_ALIGNMENT_CENTER))
 
@@ -177,7 +181,7 @@ func _render_rooms(rooms: Array) -> void:
 		child.queue_free()
 
 	if rooms.is_empty():
-		_status.text = "No squads yet — ask someone to host, or host it yourself."
+		_status.text = "No squads yet."
 		return
 
 	_status.text = "%d squad%s found" % [rooms.size(), "" if rooms.size() == 1 else "s"]

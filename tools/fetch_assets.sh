@@ -116,6 +116,16 @@ try_map() {
 
 fetch_map() {
   mkdir -p "$DEST/map"
+
+  # A map committed to the repository wins outright: no link to expire, no host
+  # to go down. Drop the .fbx or .glb (and its textures) into maps/ and it is
+  # simply used.
+  if [ -d "$ROOT/maps" ] && [ -n "$(find "$ROOT/maps" -type f 2>/dev/null)" ]; then
+    echo "==> map  from the repository's maps/ folder"
+    cp -r "$ROOT/maps/." "$DEST/map/"
+    find "$DEST/map" -type f -printf '      %10s  %P\n' | sort -k2 | head -40
+    return 0
+  fi
   [ -n "$MAP_URLS" ] || { echo "==> no map url configured"; return 0; }
   while IFS= read -r url; do
     [ -n "$url" ] || continue
@@ -145,16 +155,10 @@ echo "$KENNEY_DIRS" | paste -sd' ' -
 echo
 
 WANTED="fantasy-town-kit-1.0 kenney_natureKit_2.1 carkit_v1.4"
-GUN_KITS="$(echo "$KENNEY_DIRS" | grep -iE 'blaster|weapon|gun|shooter' || true)"
-if [ -n "$GUN_KITS" ]; then
-  echo "    weapon kits: $(echo "$GUN_KITS" | paste -sd' ' -)"
-else
-  echo "::warning::no weapon kit in the mirror — agents fall back to melee models"
-fi
 
 git -C "$WORK/kenney" sparse-checkout init --cone >/dev/null
 # shellcheck disable=SC2086
-git -C "$WORK/kenney" sparse-checkout set $WANTED $GUN_KITS >/dev/null
+git -C "$WORK/kenney" sparse-checkout set $WANTED >/dev/null
 git -C "$WORK/kenney" checkout --quiet
 
 # KayKit by Kay Lousberg: rigged characters with animation clips, also CC0.
@@ -226,17 +230,25 @@ collect "$NATURE" props "campfire*.glb" 2
 # --- characters and weapons ---------------------------------------------------
 
 collect "$KAY" characters "*.glb"
-# Guns, from whichever Kenney weapon kit the mirror turned out to have. The
-# agents carry these; the fantasy set below is only what they fall back to.
-if [ -n "$GUN_KITS" ]; then
-  while IFS= read -r kit; do
-    [ -n "$kit" ] || continue
-    echo "=== $kit ==="
-    find "$WORK/kenney/$kit" -iname '*.glb' -printf '%f\n' 2>/dev/null \
-      | sort | paste -sd' ' -
-    collect "$WORK/kenney/$kit" weapons "*.glb"
-  done <<< "$GUN_KITS"
-fi
+# Guns and gunfire, from Kenney's own CC0 FPS starter kit.
+#
+# The mirror's "weapon" folders turned out to be 2D sprite packs — every one
+# yielded zero models — and there is no larger free 3D gun pack this build can
+# reach. Two real gun bodies is what exists; the five weapons are built from
+# them by silhouette, size, colour and voice.
+sparse_clone "https://github.com/KenneyNL/Starter-Kit-FPS.git" fps "models" "sounds"
+
+FPS="$WORK/fps"
+echo "=== Kenney FPS kit ==="
+find "$FPS/models" -iname '*.glb' -printf '%f\n' 2>/dev/null | sort | paste -sd' ' -
+collect "$FPS/models" weapons "blaster*.glb"
+
+# Its gunshots are recordings, which beat anything synthesised.
+mkdir -p "$DEST/audio"
+collect "$FPS/sounds" audio "blaster*.ogg"
+collect "$FPS/sounds" audio "jump_a.ogg"
+collect "$FPS/sounds" audio "land.ogg"
+collect "$FPS/sounds" audio "enemy_hurt.ogg"
 
 collect "$KAY" weapons "sword*.gltf"
 collect "$KAY" weapons "axe*.gltf"

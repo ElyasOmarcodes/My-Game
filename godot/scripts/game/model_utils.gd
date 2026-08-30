@@ -155,6 +155,20 @@ static func hand_attachment(model: Node3D, right := true) -> BoneAttachment3D:
 		return attachment
 	return null
 
+## Scales a node so its longest side measures `target` world units, undoing the
+## scale it inherited. A gun is longer than it is tall, so fitting it by height
+## makes a rifle and a pistol come out the same size.
+static func fit_length_world(node: Node3D, target: float) -> void:
+	var bounds := _bounds_without_tree(node)
+	var longest := maxf(maxf(bounds.size.x, bounds.size.y), bounds.size.z)
+	if longest <= 0.0001:
+		return
+	var inherited := 1.0
+	var parent := node.get_parent_node_3d()
+	if parent != null:
+		inherited = maxf(parent.global_transform.basis.get_scale().y, 0.0001)
+	node.scale = Vector3.ONE * (target / longest / inherited)
+
 ## Scales a node so it measures `target` in world units, undoing whatever scale
 ## it inherited from its parents. Needs the node to be inside the tree.
 static func fit_height_world(node: Node3D, target: float) -> void:

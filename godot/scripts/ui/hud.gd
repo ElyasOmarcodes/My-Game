@@ -36,13 +36,15 @@ func _ready() -> void:
 	root.add_child(controls)
 
 func _build_vitals(root: Control) -> void:
+	# Vitals and ammo sit along the top. The bottom of the screen belongs to the
+	# buttons, and those move wherever the player drags them, so anything fixed
+	# down there is one layout change away from being underneath a thumb.
 	var box := VBoxContainer.new()
-	box.position = Vector2(24, 0)
-	box.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-	box.offset_top = -170
-	box.offset_left = 32
-	box.offset_right = 420
-	box.offset_bottom = -24
+	box.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	box.offset_left = 36
+	box.offset_right = 440
+	box.offset_top = 28
+	box.offset_bottom = 190
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(box)
 
@@ -61,12 +63,11 @@ func _build_vitals(root: Control) -> void:
 
 func _build_ammo(root: Control) -> void:
 	var box := VBoxContainer.new()
-	box.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	box.offset_left = -700
-	box.offset_right = -340
-	box.offset_top = -160
-	box.offset_bottom = -32
-	box.alignment = BoxContainer.ALIGNMENT_END
+	box.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	box.offset_left = -420
+	box.offset_right = -36
+	box.offset_top = 28
+	box.offset_bottom = 190
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(box)
 
@@ -93,7 +94,7 @@ func _build_crosshair(root: Control) -> void:
 func _build_banner(root: Control) -> void:
 	_banner = Label.new()
 	_banner.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	_banner.offset_top = 18
+	_banner.offset_top = 210
 	_banner.offset_left = -300
 	_banner.offset_right = 300
 	_banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

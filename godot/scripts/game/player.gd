@@ -206,11 +206,25 @@ func _attach_weapon() -> void:
 				hand.add_child(instance)
 			else:
 				_muzzle.add_child(instance)
-			ModelUtils.fit_height_world(instance, 0.6)
+			# Two gun bodies carry five weapons, so size and colour are what
+			# separate a sidearm from a marksman rifle at a glance.
+			ModelUtils.fit_length_world(instance,
+				float(weapon_def.get("model_size", 0.6)))
+			_paint_weapon(instance, weapon_def.get("tint", Color.WHITE))
 	else:
 		_add_box(_muzzle, Vector3(0, 0, 0.2), Vector3(0.09, 0.12, 0.55), Color(0.08, 0.09, 0.1))
 		_add_box(_muzzle, Vector3(0, 0.08, 0.1), Vector3(0.03, 0.02, 0.1),
 			agent.get("accent", Color.CYAN), true)
+
+## Recolours the gun without hiding the model's own shading.
+func _paint_weapon(node: Node, tint: Color) -> void:
+	for child in node.get_children():
+		if child is MeshInstance3D:
+			var overlay := StandardMaterial3D.new()
+			overlay.albedo_color = Color(tint.r, tint.g, tint.b, 0.55)
+			overlay.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			(child as MeshInstance3D).material_overlay = overlay
+		_paint_weapon(child, tint)
 
 func _tint(node: Node) -> void:
 	# Team colour on the imported model, applied as an overlay so the kit's own
