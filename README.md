@@ -50,11 +50,25 @@ anything missing, so the project still runs before a single file has been fetche
 
 | Category | Source | Licence |
 | --- | --- | --- |
-| `map` | Whatever URL `godot/assets.json` names, when it resolves | supplied |
+| `map` | A file in `maps/`, else the URLs in `godot/assets.json` | supplied |
 | `walls`, `roofs` | Kenney Fantasy Town Kit | CC0 1.0 |
 | `props` | Kenney Fantasy Town + Nature Kits | CC0 1.0 |
-| `characters` | Quaternius Universal Animation Library, KayKit Adventurers | CC0 1.0 |
-| `weapons` | KayKit Adventurers | CC0 1.0 |
+| `characters` | three.js `Soldier.glb` (Mixamo rig), KayKit Adventurers | mixed — see below |
+| `weapons` | Kenney Starter-Kit-FPS | CC0 1.0 |
+| `throwables` | KayKit Adventurers | CC0 1.0 |
+| `audio` | Kenney Starter-Kit-FPS, plus `tools/make_sounds.py` | CC0 1.0 |
+
+Everything is CC0 except the agents' body, which is a Mixamo rig distributed
+with three.js. `godot/assets/CREDITS.md` says so; delete that one entry from
+`godot/assets.json` and the game falls back to the CC0 adventurers.
+
+### Supplying your own map
+
+Drop a `.fbx`, `.glb` or `.gltf` (with its textures) into a `maps/` folder at
+the root of this repository and it is used as the world — rescaled if it arrives
+in something other than metres, rested on the ground, given trimesh collision,
+with spawn points dropped onto its floor. A committed file wins over any URL,
+because a link can stop serving and a committed file cannot.
 
 If a map downloads, it is used as the world as-is: rescaled if it arrives in
 something other than metres, rested on the ground, given trimesh collision and
@@ -64,13 +78,32 @@ kit's wall and roof modules on a road grid — the same seed everywhere.
 Which sources are used is declared in [`godot/assets.json`](godot/assets.json),
 so changing the art is a one-file edit rather than a code change.
 
+## Controls
+
+The whole touch layout is the player's: **Settings → Edit control layout** lets
+them drag every button where their thumbs reach and size each one with a slider.
+The layout is saved per phone.
+
+| Button | Does |
+| --- | --- |
+| Reticle | Fire — tracer, muzzle flash, the weapon's own report, camera kick |
+| Chevrons up | Jump |
+| Circular arrow | Reload |
+| Grenade | Throw — a real thrown body on a fuse, lethal inside its blast |
+| Triple chevron | Sprint (a toggle, so a thumb is not held down) |
+| Chevrons down | Crouch — slower, shorter, harder to hit |
+| Lying figure | Prone — slower still, and lower |
+
+Five bullets kill a full-health agent, and one grenade does.
+
 ## Repository layout
 
 ```
-godot/scripts/game   world building, agents, player, asset library
+godot/scripts/game   world building, agents, player, weapons, grenades, sound
 godot/scripts/net    LAN discovery, ENet session
-godot/scripts/ui     menu, HUD, touch controls
+godot/scripts/ui     menu, settings, layout editor, HUD, touch controls
 godot/scripts/tools  the screenshot rig
+maps/                drop a level here and the game uses it
 godot/scenes         two scenes, one node each — the world is built at runtime
 tools                the art fetcher
 .github/workflows    the APK build
@@ -112,6 +145,10 @@ It is signed with the **Android debug key**, so it installs on any phone with
 په لیست کې ویني او ورسره یوځای کیږي.
 
 - انجن: **Godot 4.3** (لایسنس ته اړتیا نلري) ، ژبه: GDScript
+- بټنې: لوی، آیکون‌لرونکې، او په تنظیماتو کې د **خپلې خوښې سره** ځای او اندازه
+  بدلولی شئ (Settings → Edit control layout)
+- فایر، جمپ، ریلوډ، ګرنیټ، منډه، ګیناستل او پروت کول — ټول شته
+- پنځه ګولۍ یو اجنټ وژني؛ یو ګرنیټ په یوه ګوزار
 - نقشه: که په `godot/assets.json` کې یوه چمتو نقشه ورکړل شوې وي هماغه کارول کیږي،
   که نه نو ښار د CC0 ماډلونو څخه پخپله جوړیږي
 - کرکټرونه او اسلحې: د Quaternius او KayKit وړیا (CC0) موډلونه

@@ -319,6 +319,7 @@ here anyway, because these artists made the game look like a game.
 | Nature Kit | Kenney | kenney.nl | CC0 1.0 |
 | Car Kit | Kenney | kenney.nl | CC0 1.0 |
 | Adventurers Character Pack | Kay Lousberg | kaylousberg.com | CC0 1.0 |
+| Starter-Kit-FPS (guns, gunfire) | Kenney | github.com/KenneyNL | CC0 1.0 |
 | Soldier.glb, Xbot.glb | Mixamo (Adobe) | three.js examples, MIT repository | see below |
 
 The two realistic bodies come from the three.js examples folder. three.js itself
