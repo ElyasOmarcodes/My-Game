@@ -176,7 +176,7 @@ func _build_ground() -> void:
 	mesh.position.y = -0.5
 
 	var material := StandardMaterial3D.new()
-	material.albedo_color = Color(0.09, 0.10, 0.12)
+	material.albedo_color = Color(0.47, 0.43, 0.35)
 	material.roughness = 0.95
 	mesh.material_override = material
 	add_child(mesh)
@@ -201,7 +201,7 @@ func _road_strip(centre: Vector3, size: Vector3) -> void:
 	mesh.position = centre
 
 	var material := StandardMaterial3D.new()
-	material.albedo_color = Color(0.055, 0.06, 0.072)
+	material.albedo_color = Color(0.20, 0.20, 0.21)
 	material.roughness = 0.85
 	mesh.material_override = material
 	add_child(mesh)
@@ -223,8 +223,13 @@ func _build_block(gx: int, gz: int) -> void:
 		_build_park(centre)
 		return
 
-	# One building per block, turned to face a random street.
-	_place_building(centre, _rng.randi_range(0, 3) * 90.0)
+	# Two houses to a block: one left every lot looking abandoned from the air.
+	var quarter := BLOCK_SIZE * 0.24
+	_place_building(centre + Vector3(-quarter, 0, -quarter),
+		_rng.randi_range(0, 3) * 90.0)
+	if _rng.randf() < 0.75:
+		_place_building(centre + Vector3(quarter, 0, quarter),
+			_rng.randi_range(0, 3) * 90.0)
 
 	for i in 3:
 		var offset := Vector3(
@@ -241,7 +246,7 @@ func _build_park(centre: Vector3) -> void:
 	mesh.position = centre + Vector3(0, 0.1, 0)
 
 	var material := StandardMaterial3D.new()
-	material.albedo_color = Color(0.09, 0.16, 0.10)
+	material.albedo_color = Color(0.30, 0.42, 0.22)
 	mesh.material_override = material
 	add_child(mesh)
 
@@ -313,7 +318,7 @@ func _place_building(position: Vector3, yaw: float) -> void:
 		_placed += 1
 		return
 
-	var width := _rng.randi_range(2, 4)
+	var width := _rng.randi_range(2, 3)
 	var depth := _rng.randi_range(2, 3)
 	var storeys := _rng.randi_range(1, 3)
 	var family := "wallWood" if _rng.randf() < 0.45 else "wall"
