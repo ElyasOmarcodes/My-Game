@@ -68,7 +68,45 @@ func _run() -> void:
 	await _shot("godot-weapons",
 		stage + Vector3(-0.2, 1.15, 2.4), stage + Vector3(-0.2, 1.05, 0), 34.0)
 
+	# Back to a street view: the overlays are photographed over the world, not
+	# over the line-up stage the agents are standing on.
+	await _shot("godot-hud-setup",
+		middle + Vector3(span * 0.16, 2.0, -span * 0.2),
+		middle + Vector3(span * 0.02, 2.0, 0), 70.0)
+	DirAccess.remove_absolute("%s/godot-hud-setup.png" % _output_dir)
+	await _shoot_ui()
+
 ## The roster on a clean plate, well clear of the map so nothing photobombs it.
+## The two screens a player actually spends time in. They are photographed the
+## same way as the world, from the same build, so what is in docs/screenshots is
+## what ships rather than a mock-up of it.
+func _shoot_ui() -> void:
+	var hud := Hud.new()
+	add_child(hud)
+	var player := Player.create(_library, Session.agent_id, Session.Team.ALPHA,
+		Session.player_id, true)
+	add_child(player)
+	player.global_transform = _city.spawn_for(0, Session.Team.ALPHA)
+	hud.bind(player)
+	await _shot_here("godot-hud")
+	hud.queue_free()
+	player.queue_free()
+
+	var menu := MainMenu.new()
+	add_child(menu)
+	await _shot_here("godot-menu")
+	menu.queue_free()
+
+## A frame from wherever the camera already is — for the overlays, where the
+## world behind them only has to be plausible.
+func _shot_here(name: String) -> void:
+	_camera.current = true
+	for i in SETTLE_FRAMES + 4:
+		await RenderingServer.frame_post_draw
+	var image := get_viewport().get_texture().get_image()
+	var path := "%s/%s.png" % [_output_dir, name]
+	print("[shot] %s -> %s (%d)" % [name, path, image.save_png(path)])
+
 func _spawn_lineup(stage: Vector3) -> void:
 	var floor_mesh := MeshInstance3D.new()
 	var plate := BoxMesh.new()
@@ -95,6 +133,7 @@ func _spawn_lineup(stage: Vector3) -> void:
 		index += 1
 
 func _shot(name: String, from: Vector3, look_at: Vector3, fov: float) -> void:
+	_camera.current = true
 	_camera.fov = fov
 	_camera.global_position = from
 	_camera.look_at(look_at, Vector3.UP)

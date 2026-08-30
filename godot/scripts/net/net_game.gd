@@ -186,9 +186,20 @@ func _damage_request(victim_id: String, damage: float) -> void:
 func _damage_applied(victim_id: String, damage: float, attacker_id: String) -> void:
 	_apply_damage(victim_id, damage, attacker_id)
 
+## Damage lands on whichever agent carries the id, wherever it lives in the
+## scene. Routing it only to the local player is why shooting anything else —
+## a squadmate, a drill target — looked like it did nothing at all.
 func _apply_damage(victim_id: String, damage: float, attacker_id: String) -> void:
 	if victim_id == Session.player_id and local_player and local_player.has_method("apply_damage"):
 		local_player.apply_damage(damage, attacker_id)
+		return
+
+	for node in get_tree().get_nodes_in_group("agents"):
+		if String(node.get("player_id")) != victim_id:
+			continue
+		if node.has_method("apply_damage"):
+			node.apply_damage(damage, attacker_id)
+		return
 
 func _player_id_for(peer_id: int) -> String:
 	var entry: Dictionary = players.get(peer_id, {})

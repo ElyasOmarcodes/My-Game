@@ -54,6 +54,26 @@ func _on_solo() -> void:
 	Session.map_seed = randi()
 	_clear_menu()
 	_start_match(Session.map_seed)
+	_spawn_drill_targets()
+
+## Solo drill needs something to shoot at, or the weapon has nothing to prove it
+## works on and firing reads as broken. Five standing agents, five bullets each.
+func _spawn_drill_targets() -> void:
+	if city == null or local_player == null:
+		return
+	var here := local_player.global_position
+	for i in 5:
+		var angle := TAU * i / 5.0
+		var body := RemotePlayer.create(library, {
+			"id": "drill-%d" % i,
+			"agent": AgentCatalog.AGENTS[i % AgentCatalog.AGENTS.size()]["id"],
+			"team": Session.Team.BRAVO,
+		})
+		add_child(body)
+		var spot := here + Vector3(cos(angle), 0.0, sin(angle)) * (11.0 + i * 2.5)
+		body.place(Transform3D(Basis(Vector3.UP, angle + PI), spot))
+	if hud:
+		hud.flash("DRILL · five targets · five rounds each", 5.0)
 
 func _on_match_started(map_seed: int) -> void:
 	if city == null:

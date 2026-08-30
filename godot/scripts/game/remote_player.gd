@@ -10,6 +10,9 @@ const ROTATION_SMOOTHING := 14.0
 
 var player_id: String = ""
 var agent: Dictionary = {}
+var health := 100.0
+var max_health := 100.0
+var alive := true
 
 var _target_position := Vector3.ZERO
 var _target_yaw := 0.0
@@ -26,6 +29,10 @@ static func create(library: AssetLibrary, entry: Dictionary) -> RemotePlayer:
 	return body
 
 func _ready() -> void:
+	# The same group the local player joins, so a shot or a blast finds every
+	# agent without knowing how the scene is arranged.
+	add_to_group("agents")
+
 	var library: AssetLibrary = get_meta("library")
 	var scene: PackedScene = null
 	if library and library.has("characters"):
@@ -57,6 +64,7 @@ func _ready() -> void:
 	# A body the local weapon can actually hit.
 	var area := StaticBody3D.new()
 	area.collision_layer = 2
+	area.collision_mask = 0
 	var shape := CollisionShape3D.new()
 	var capsule_shape := CapsuleShape3D.new()
 	capsule_shape.height = 1.8
@@ -98,6 +106,40 @@ func _arm(library: AssetLibrary) -> void:
 		add_child(instance)
 		instance.position = Vector3(0.28, 1.2, 0.35)
 	ModelUtils.fit_height_world(instance, 0.6)
+
+## Takes a hit like the local player does, so a shot that lands is visible from
+## both ends and a drill target can actually be knocked down.
+func apply_damage(amount: float, _attacker_id: String) -> void:
+	if not alive:
+		return
+	health = maxf(0.0, health - amount)
+	_flash_hit()
+	if health <= 0.0:
+		alive = false
+		visible = false
+		await get_tree().create_timer(3.0).timeout
+		health = max_health
+		alive = true
+		visible = true
+
+func _flash_hit() -> void:
+	if _model == null:
+		return
+	var overlay := StandardMaterial3D.new()
+	overlay.albedo_color = Color(1.0, 0.25, 0.25, 0.55)
+	overlay.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	overlay.emission_enabled = true
+	overlay.emission = Color(1.0, 0.3, 0.3)
+	overlay.emission_energy_multiplier = 2.0
+	_paint(_model, overlay)
+	await get_tree().create_timer(0.12).timeout
+	_paint(_model, null)
+
+func _paint(node: Node, overlay: Material) -> void:
+	for child in node.get_children():
+		if child is MeshInstance3D:
+			(child as MeshInstance3D).material_overlay = overlay
+		_paint(child, overlay)
 
 func _process(delta: float) -> void:
 	if has_meta("target_position"):

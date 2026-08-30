@@ -1,11 +1,13 @@
 {
   "_comment": "Where the build gets its art. Swapping a source here changes the game's look without touching code — the loader matches models by category and filename hint.",
   "map": {
-    "_comment": "A ready-made level. When this downloads and contains a model the game uses it as the world; otherwise it assembles a town from the kit modules below.",
-    "name": "Supplied map",
-    "url": "https://cdn.z-s.workers.dev/d0cb74f2-627d-4acc-bf83-4cf5cbf5c7c9",
+    "_comment": "Ready-made levels, tried in order. The first that downloads and holds a model becomes the world; the assembled town is the fallback and is always available.",
+    "urls": [
+      "https://filelinktj-60d6a402095f.herokuapp.com/f/45ae54b6ee4f7915125e/TATOOINE%2B-%2BLITE%2BPACK%2B.fbx",
+      "https://cdn.z-s.workers.dev/d0cb74f2-627d-4acc-bf83-4cf5cbf5c7c9"
+    ],
     "supplied_by": "repository owner",
-    "status": "the URL returned an error on the build runner too; replace it with a working direct-download link"
+    "note": "Neither host is reachable from the development sandbox, so the build runner is the only place these can be fetched. The build reports what it got."
   },
   "sources": [
     {
@@ -18,6 +20,16 @@
       ],
       "author": "Kenney",
       "licence": "CC0-1.0"
+    },
+    {
+      "name": "Kenney weapon kit",
+      "url": "https://github.com/ETdoFresh/kenney.nl.git",
+      "folders": [
+        "discovered at build time — any kit matching blaster/weapon/gun"
+      ],
+      "author": "Kenney",
+      "licence": "CC0-1.0",
+      "why": "Real gun models for the five weapons, rather than fantasy melee"
     },
     {
       "name": "KayKit Adventurers",
@@ -57,6 +69,8 @@
     "roofs": "Roof modules that cap a house",
     "props": "Scattered cover, trees, barrels, lanterns",
     "characters": "Rigged agent bodies, matched by AgentCatalog.model_hint",
-    "weapons": "Held models, matched by weapon model_hint"
+    "weapons": "Held models, matched by weapon model_hint",
+    "throwables": "Grenades",
+    "audio": "Weapon voices, synthesised by tools/make_sounds.py"
   }
 }

@@ -18,11 +18,20 @@ config/icon="res://icon.svg"
 boot_splash/bg_color=Color(0.02, 0.027, 0.047, 1)
 boot_splash/show_image=false
 
+[filesystem]
+
+; The supplied map arrives as FBX. Godot 4.3 reads it with ufbx and needs no
+; external converter, but the importer is stated here rather than left to a
+; default that has moved between releases.
+import/fbx/enabled=true
+import/blender/enabled=false
+
 [autoload]
 
 Session="*res://scripts/game/session.gd"
 Lan="*res://scripts/net/lan_discovery.gd"
 NetGame="*res://scripts/net/net_game.gd"
+Sfx="*res://scripts/game/sfx.gd"
 
 [display]
 

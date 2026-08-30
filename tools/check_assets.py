@@ -10,6 +10,7 @@ import json
 import sys
 
 REQUIRED = {"walls": 5, "roofs": 3, "props": 20, "characters": 3, "weapons": 3}
+OPTIONAL = ["map", "throwables"]
 MANIFEST = "godot/assets/manifest.json"
 
 
@@ -23,10 +24,10 @@ def main() -> int:
         if found < minimum:
             short.append("%s %d<%d" % (category, found, minimum))
 
-    # The supplied map is optional: without one the town is generated instead.
-    supplied = len(catalog.get("map", []))
-    print("  %-12s %3d  (optional)" % ("map", supplied))
-    if not supplied:
+    for category in OPTIONAL:
+        found = len(catalog.get(category, []))
+        print("  %-12s %3d  (optional)" % (category, found))
+    if not catalog.get("map"):
         print("::warning::no supplied map landed - the town will be generated")
 
     if short:

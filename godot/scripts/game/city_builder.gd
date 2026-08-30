@@ -27,8 +27,10 @@ func build(library: AssetLibrary, map_seed: int) -> void:
 	_rng.seed = map_seed
 	spawns.clear()
 
-	# A map somebody drew beats one a loop generates, so it wins when present.
-	if _build_supplied_map():
+	# A map somebody drew beats one a loop generates, so it wins when present —
+	# unless the player has pinned the choice in Settings.
+	var preference := String(Session.get_pref("world", "map", "auto"))
+	if preference != "town" and _build_supplied_map():
 		_ring_spawns()
 		print("[city] supplied map, %d spawns" % spawns.size())
 		return

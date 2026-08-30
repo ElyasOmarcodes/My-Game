@@ -53,57 +53,78 @@ collect() {
 # (the egress policy blocks it) — the runner is the only place this can be
 # fetched and identified, so it reports loudly what it got.
 
-MAP_URL="$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('map',{}).get('url',''))" "$CONFIG")"
+MAP_URLS="$(python3 - "$CONFIG" <<'MAPCFG'
+import json, sys
+config = json.load(open(sys.argv[1]))
+entry = config.get("map", {})
+urls = entry.get("urls") or ([entry["url"]] if entry.get("url") else [])
+print("\n".join(urls))
+MAPCFG
+)"
 
-fetch_map() {
-  [ -n "$MAP_URL" ] || { echo "==> no map url configured"; return 0; }
-
-  echo "==> map  $MAP_URL"
-  mkdir -p "$WORK/map" "$DEST/map"
+## Downloads one candidate and stages whatever models it holds. Returns 0 only
+## when something Godot can import actually landed.
+try_map() {
+  local url="$1"
+  echo "==> map  $url"
+  rm -rf "$WORK/map"; mkdir -p "$WORK/map"
   local blob="$WORK/map/download.bin"
 
-  if ! curl -fsSL --retry 3 --retry-delay 2 --max-time 600 -o "$blob" "$MAP_URL"; then
-    echo "::warning::map download failed — falling back to the generated town"
-    return 0
+  if ! curl -fsSL --retry 2 --retry-delay 2 --max-time 600 -o "$blob" "$url"; then
+    echo "    download failed"
+    return 1
   fi
 
-  echo "    $(stat -c%s "$blob") bytes"
-  echo "    type: $(file -b "$blob")"
+  echo "    $(stat -c%s "$blob") bytes — $(file -b "$blob")"
 
-  # The link gives no filename or extension, so unpack by content sniffing.
-  local kind; kind="$(file -b --mime-type "$blob")"
-  case "$kind" in
-    application/zip)  (cd "$WORK/map" && unzip -q -o download.bin) || true ;;
+  # The links carry no filename, so unpack by sniffing the content.
+  case "$(file -b --mime-type "$blob")" in
+    application/zip) (cd "$WORK/map" && unzip -q -o download.bin) || true ;;
     application/x-7z-compressed) 7z x -y -o"$WORK/map" "$blob" >/dev/null || true ;;
     application/gzip|application/x-gzip|application/x-tar)
       tar -xf "$blob" -C "$WORK/map" 2>/dev/null || true ;;
-    *) ;;
   esac
 
-  echo "    unpacked contents:"
-  find "$WORK/map" -type f -printf '      %10s  %P\n' 2>/dev/null | sort -k2 | head -80
-  echo "      ($(find "$WORK/map" -type f | wc -l) files total)"
+  echo "    contents:"
+  find "$WORK/map" -type f -printf '      %10s  %P\n' 2>/dev/null | sort -k2 | head -60
+  echo "      ($(find "$WORK/map" -type f | wc -l) files)"
 
-  # A .gltf needs its .bin buffers and textures beside it, so the tree is kept
-  # rather than flattened the way the module kits are.
+  # A .gltf and an .fbx both need their sidecar buffers and textures, so the
+  # tree is kept rather than flattened the way the module kits are.
   local found=0
   while IFS= read -r file; do
-    local rel; rel="${file#"$WORK/map/"}"
+    rel="${file#"$WORK/map/"}"
     mkdir -p "$DEST/map/$(dirname "$rel")"
     cp "$file" "$DEST/map/$rel" && found=$((found + 1))
   done < <(find "$WORK/map" -type f \
-    \( -iname '*.glb' -o -iname '*.gltf' -o -iname '*.obj' -o -iname '*.mtl' \
-       -o -iname '*.bin' -o -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' \
-       -o -iname '*.ktx2' -o -iname '*.webp' \) 2>/dev/null)
+    \( -iname '*.glb' -o -iname '*.gltf' -o -iname '*.fbx' -o -iname '*.obj' \
+       -o -iname '*.mtl' -o -iname '*.bin' -o -iname '*.png' -o -iname '*.jpg' \
+       -o -iname '*.jpeg' -o -iname '*.tga' -o -iname '*.webp' \) 2>/dev/null)
 
-  # The blob may itself be a bare model with no extension for Godot to go on.
+  # The blob may itself be a bare model with no extension to go on.
   if [ "$found" -eq 0 ]; then
-    case "$(head -c 4 "$blob")" in
-      glTF) cp "$blob" "$DEST/map/level.glb"; found=1; echo "    bare glb, named level.glb" ;;
-      *)    echo "::warning::map holds no model Godot can import" ;;
+    case "$(head -c 20 "$blob" | tr -d '\0')" in
+      glTF*)          cp "$blob" "$DEST/map/level.glb"; found=1 ;;
+      "Kaydara FBX"*) cp "$blob" "$DEST/map/level.fbx"; found=1 ;;
     esac
+    [ "$found" -gt 0 ] && echo "    bare model, named by its magic bytes"
   fi
-  echo "    map models staged: $found files"
+
+  echo "    staged $found file(s)"
+  [ "$found" -gt 0 ]
+}
+
+fetch_map() {
+  mkdir -p "$DEST/map"
+  [ -n "$MAP_URLS" ] || { echo "==> no map url configured"; return 0; }
+  while IFS= read -r url; do
+    [ -n "$url" ] || continue
+    if try_map "$url"; then
+      echo "    map ready"
+      return 0
+    fi
+  done <<< "$MAP_URLS"
+  echo "::warning::no configured map could be fetched — the town will be generated"
 }
 
 fetch_map
@@ -111,8 +132,30 @@ fetch_map
 # --- sources ------------------------------------------------------------------
 
 # Kenney's kits, via a community mirror of kenney.nl. Every Kenney asset is CC0.
-sparse_clone "https://github.com/ETdoFresh/kenney.nl.git" kenney \
-  "fantasy-town-kit-1.0" "kenney_natureKit_2.1" "carkit_v1.4"
+#
+# Which folders the mirror uses is not something to guess at — an earlier build
+# shipped a city of grey boxes because a guessed path matched nothing. Clone
+# without a checkout, read the real directory names, then ask for what is there.
+echo "==> kenney (listing)"
+git clone --quiet --filter=blob:none --no-checkout --depth 1 \
+  "https://github.com/ETdoFresh/kenney.nl.git" "$WORK/kenney"
+KENNEY_DIRS="$(git -C "$WORK/kenney" ls-tree -d --name-only HEAD)"
+echo "=== kits in the mirror ($(echo "$KENNEY_DIRS" | wc -l)) ==="
+echo "$KENNEY_DIRS" | paste -sd' ' -
+echo
+
+WANTED="fantasy-town-kit-1.0 kenney_natureKit_2.1 carkit_v1.4"
+GUN_KITS="$(echo "$KENNEY_DIRS" | grep -iE 'blaster|weapon|gun|shooter' || true)"
+if [ -n "$GUN_KITS" ]; then
+  echo "    weapon kits: $(echo "$GUN_KITS" | paste -sd' ' -)"
+else
+  echo "::warning::no weapon kit in the mirror — agents fall back to melee models"
+fi
+
+git -C "$WORK/kenney" sparse-checkout init --cone >/dev/null
+# shellcheck disable=SC2086
+git -C "$WORK/kenney" sparse-checkout set $WANTED $GUN_KITS >/dev/null
+git -C "$WORK/kenney" checkout --quiet
 
 # KayKit by Kay Lousberg: rigged characters with animation clips, also CC0.
 sparse_clone "https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0.git" \
@@ -183,13 +226,38 @@ collect "$NATURE" props "campfire*.glb" 2
 # --- characters and weapons ---------------------------------------------------
 
 collect "$KAY" characters "*.glb"
+# Guns, from whichever Kenney weapon kit the mirror turned out to have. The
+# agents carry these; the fantasy set below is only what they fall back to.
+if [ -n "$GUN_KITS" ]; then
+  while IFS= read -r kit; do
+    [ -n "$kit" ] || continue
+    echo "=== $kit ==="
+    find "$WORK/kenney/$kit" -iname '*.glb' -printf '%f\n' 2>/dev/null \
+      | sort | paste -sd' ' -
+    collect "$WORK/kenney/$kit" weapons "*.glb"
+  done <<< "$GUN_KITS"
+fi
+
 collect "$KAY" weapons "sword*.gltf"
 collect "$KAY" weapons "axe*.gltf"
 collect "$KAY" weapons "crossbow*.gltf"
-collect "$KAY" weapons "dagger*.gltf"
 collect "$KAY" weapons "staff*.gltf"
 collect "$KAY" weapons "*.bin"          # gltf buffers must sit beside the .gltf
 collect "$KAY" weapons "*texture*.png"
+
+# Something to throw.
+collect "$KAY" throwables "smokebomb*.gltf"
+collect "$KAY" throwables "*.bin"
+collect "$KAY" throwables "*texture*.png"
+
+# --- sounds -------------------------------------------------------------------
+#
+# Synthesised rather than downloaded: nothing to license, nothing to keep in the
+# repository, and each weapon still gets a voice of its own.
+
+echo
+echo "=== weapon sounds ==="
+python3 "$ROOT/tools/make_sounds.py" "$DEST/audio"
 
 # --- manifest -----------------------------------------------------------------
 
@@ -206,7 +274,7 @@ for category in sorted(os.listdir(dest)):
     models = sorted(
         "res://assets/%s/%s" % (category, name)
         for name in os.listdir(folder)
-        if name.lower().endswith((".glb", ".gltf"))
+        if name.lower().endswith((".glb", ".gltf", ".fbx"))
     )
     if models:
         categories[category] = models
