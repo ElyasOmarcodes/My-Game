@@ -10,7 +10,11 @@ extends RefCounted
 static func visual_bounds(node: Node3D) -> AABB:
 	var bounds := AABB()
 	var first := true
-	for child in node.find_children("*", "MeshInstance3D", true, false):
+	# A .obj imports as a bare Mesh and is spawned as a single MeshInstance3D,
+	# so the node itself is the geometry — searching only its children found
+	# nothing, measured zero, and left those models at whatever scale the artist
+	# saved them at. One of them filled the sky.
+	for child in _mesh_nodes(node):
 		var mesh_instance := child as MeshInstance3D
 		if mesh_instance == null or mesh_instance.mesh == null:
 			continue
@@ -66,7 +70,7 @@ static func measure(scene: Resource) -> AABB:
 static func _bounds_without_tree(node: Node3D) -> AABB:
 	var bounds := AABB()
 	var first := true
-	for child in node.find_children("*", "MeshInstance3D", true, false):
+	for child in _mesh_nodes(node):
 		var mesh_instance := child as MeshInstance3D
 		if mesh_instance == null or mesh_instance.mesh == null:
 			continue
@@ -77,6 +81,13 @@ static func _bounds_without_tree(node: Node3D) -> AABB:
 		else:
 			bounds = bounds.merge(local)
 	return bounds
+
+## Every mesh under `node`, including `node` itself when it is one.
+static func _mesh_nodes(node: Node3D) -> Array:
+	var found: Array = node.find_children("*", "MeshInstance3D", true, false)
+	if node is MeshInstance3D:
+		found.append(node)
+	return found
 
 ## The transform of `leaf` expressed in `root`'s space.
 static func _chain(root: Node3D, leaf: Node3D) -> Transform3D:

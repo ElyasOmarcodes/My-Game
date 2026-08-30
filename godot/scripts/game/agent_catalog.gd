@@ -47,7 +47,7 @@ const WEAPONS := [
 		"reload": 1.7, "range": 130.0, "kick": 1.1,
 		"model_hint": "m4a4", "model_size": 0.78,
 		"model_rotation": Vector3(0, 90, 0), "tint": Color("#4A5560"),
-		"voice": "rifle", "slot": "primary",
+		"voice": "blaster", "slot": "primary",
 	},
 	{
 		"id": "ak47", "name": "AK-47", "class": "Assault rifle",
@@ -70,7 +70,7 @@ const WEAPONS := [
 		"damage": 20.0, "rate": 13.0, "spread": 0.028, "clip": 35, "reserve": 210,
 		"reload": 1.4, "range": 62.0, "kick": 0.85,
 		"model_hint": "pack04", "model_size": 0.46,
-		"tint": Color("#5B4E7A"), "voice": "smg", "slot": "primary",
+		"tint": Color("#5B4E7A"), "voice": "blaster_repeater", "slot": "primary",
 	},
 	{
 		"id": "shotgun", "name": "Breaker 12", "class": "Shotgun",

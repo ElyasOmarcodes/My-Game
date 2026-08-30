@@ -246,6 +246,7 @@ collect "$FPS/models" weapons "blaster*.glb"
 # Its gunshots are recordings, which beat anything synthesised.
 mkdir -p "$DEST/audio"
 collect "$FPS/sounds" audio "blaster*.ogg"
+collect "$FPS/sounds" audio "weapon_change.ogg"
 collect "$FPS/sounds" audio "jump_a.ogg"
 collect "$FPS/sounds" audio "land.ogg"
 collect "$FPS/sounds" audio "enemy_hurt.ogg"
@@ -262,6 +263,27 @@ collect "$KAY" throwables "smokebomb*.gltf"
 collect "$KAY" throwables "*.bin"
 collect "$KAY" throwables "*texture*.png"
 
+# --- more gunfire -------------------------------------------------------------
+#
+# Still North Media's weapon library is CC0 and holds a real submachine-gun
+# recording, which stands in for the AK far better than anything synthesised.
+
+if git clone --quiet --depth 1 \
+    "https://github.com/PanderMusubi/sound-effects-library-weapons.git" \
+    "$WORK/gunsfx" 2>/dev/null; then
+  echo
+  echo "=== firearm recordings ==="
+  find "$WORK/gunsfx" -iname '*.ogg' -printf '%f\n' | sort | paste -sd' ' -
+  mkdir -p "$DEST/audio"
+  for file in "$WORK"/gunsfx/samples/ppsh*.ogg; do
+    [ -f "$file" ] || continue
+    cp "$file" "$DEST/audio/ak47.ogg" && echo "    audio  ak47.ogg (PPSh, CC0)"
+    break
+  done
+else
+  echo "::warning::firearm recordings unavailable — synthesised voices stand in"
+fi
+
 # --- the button icons ---------------------------------------------------------
 #
 # Drawn glyphs were readable but plainly hand-made. Kenney's on-screen controls
@@ -273,8 +295,12 @@ for kit in onscreencontrols gameicons; do
   [ -d "$WORK/kenney/$kit" ] || continue
   find "$WORK/kenney/$kit" -iname '*.png' | wc -l | xargs echo "    $kit png files:"
 done
-collect "$WORK/kenney/onscreencontrols" icons "*.png"
-collect "$WORK/kenney/gameicons" icons "*.png"
+# Only the handful the buttons actually wear. The two packs hold 800 PNGs
+# between them and all but five would be dead weight in the APK.
+for icon in target arrowUp arrowDown return fastForward; do
+  collect "$WORK/kenney/onscreencontrols" icons "$icon.png" 1
+  collect "$WORK/kenney/gameicons" icons "$icon.png" 1
+done
 
 # --- the supplied models ------------------------------------------------------
 #
@@ -347,6 +373,9 @@ here anyway, because these artists made the game look like a game.
 | Car Kit | Kenney | kenney.nl | CC0 1.0 |
 | Adventurers Character Pack | Kay Lousberg | kaylousberg.com | CC0 1.0 |
 | Starter-Kit-FPS (guns, gunfire) | Kenney | github.com/KenneyNL | CC0 1.0 |
+| On-screen controls, game icons | Kenney | kenney.nl | CC0 1.0 |
+| Weapon sound library (PPSh) | Still North Media | github.com/PanderMusubi | CC0 1.0 |
+| SWAT Operator, M4A4, AK-47, AWP, grenade | supplied by the repository owner | — | as supplied |
 | Soldier.glb, Xbot.glb | Mixamo (Adobe) | three.js examples, MIT repository | see below |
 
 The two realistic bodies come from the three.js examples folder. three.js itself

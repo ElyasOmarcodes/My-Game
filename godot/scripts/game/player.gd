@@ -254,6 +254,7 @@ func swap_weapon() -> void:
 	_muzzle = _mount
 	_slung = WeaponMount.sling(self, _library, sidearm_def)
 
+	Sfx.play("weapon_change", 0.8)
 	_next_shot_at = Time.get_ticks_msec() / 1000.0 + 0.35
 	_reload_until = 0.0
 	ammo_changed.emit(ammo_in_clip, ammo_reserve)

@@ -18,18 +18,24 @@ import wave
 
 RATE = 22050
 
+# One voice per weapon, tuned to what the real gun sounds like: a 7.62 AK barks
+# lower and slower than a 5.56 M4, a .338 has a long tail behind it, and a
+# shotgun is body with almost no crack. Where a real CC0 recording exists the
+# build fetches it instead and this one is never loaded.
+#
 # name: (seconds, brightness 0..1, body Hz, body level, crack level, rattle)
 VOICES = {
-    "rifle":     (0.34, 0.72, 118.0, 0.55, 1.00, 0.00),
-    "smg":       (0.20, 0.86, 165.0, 0.34, 0.86, 0.00),
-    "shotgun":   (0.62, 0.40,  74.0, 0.95, 0.90, 0.18),
-    "sniper":    (0.85, 0.58,  62.0, 0.80, 1.00, 0.30),
-    "pistol":    (0.26, 0.78, 140.0, 0.44, 0.92, 0.00),
-    "explosion": (1.40, 0.22,  44.0, 1.00, 0.70, 0.45),
-    "reload":    (0.42, 0.95, 320.0, 0.16, 0.30, 0.55),
-    "empty":     (0.10, 0.98, 900.0, 0.10, 0.22, 0.00),
+    "rifle":     (0.34, 0.78,  132.0, 0.48, 1.00, 0.05),
+    "ak47":      (0.46, 0.58,   92.0, 0.78, 0.96, 0.14),
+    "smg":       (0.20, 0.86,  165.0, 0.34, 0.86, 0.00),
+    "shotgun":   (0.62, 0.40,   74.0, 0.95, 0.90, 0.18),
+    "sniper":    (0.95, 0.52,   56.0, 0.88, 1.00, 0.38),
+    "pistol":    (0.26, 0.78,  140.0, 0.44, 0.92, 0.00),
+    "revolver":  (0.40, 0.62,  104.0, 0.70, 0.98, 0.16),
+    "explosion": (1.40, 0.22,   44.0, 1.00, 0.70, 0.45),
+    "reload":    (0.42, 0.95,  320.0, 0.16, 0.30, 0.55),
+    "empty":     (0.10, 0.98,  900.0, 0.10, 0.22, 0.00),
 }
-
 
 def render(seconds, brightness, body_hz, body_level, crack_level, rattle):
     total = int(RATE * seconds)

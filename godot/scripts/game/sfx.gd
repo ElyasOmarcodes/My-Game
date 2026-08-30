@@ -32,13 +32,28 @@ func _ready() -> void:
 	print("[sfx] %d clips: %s" % [_clips.size(),
 		", ".join(PackedStringArray(_clips.keys()))])
 
+## Recordings are fetched and can be absent; the synthesised set always ships.
+## A weapon names its recording first and its fallback second.
+const FALLBACKS := {
+	"blaster": "rifle",
+	"blaster_repeater": "smg",
+	"ak47": "ak47",
+}
+
 func has(clip_name: String) -> bool:
 	return _clips.has(clip_name)
+
+func _resolve(clip_name: String) -> String:
+	if _clips.has(clip_name):
+		return clip_name
+	var fallback := String(FALLBACKS.get(clip_name, ""))
+	return fallback if _clips.has(fallback) else ""
 
 ## Plays a clip in the world, so distance and direction are audible. The player
 ## is freed once the clip finishes, which keeps rapid fire from piling up nodes.
 func play_at(where: Node3D, clip_name: String, volume := 1.0, pitch := 1.0) -> void:
-	if not _clips.has(clip_name) or where == null or not where.is_inside_tree():
+	clip_name = _resolve(clip_name)
+	if clip_name == "" or where == null or not where.is_inside_tree():
 		return
 	var player := AudioStreamPlayer3D.new()
 	player.stream = _clips[clip_name]
@@ -61,7 +76,8 @@ func play_at(where: Node3D, clip_name: String, volume := 1.0, pitch := 1.0) -> v
 ## Plays without a position — for the local player's own weapon, which should
 ## sound the same wherever they are standing.
 func play(clip_name: String, volume := 1.0, pitch := 1.0) -> void:
-	if not _clips.has(clip_name):
+	clip_name = _resolve(clip_name)
+	if clip_name == "":
 		return
 	var player := AudioStreamPlayer.new()
 	player.stream = _clips[clip_name]

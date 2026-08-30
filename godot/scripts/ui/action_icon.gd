@@ -6,18 +6,22 @@ extends Control
 ## translating. Drawing them keeps the APK free of an icon atlas and lets every
 ## glyph scale to whatever size the player drags the button to.
 
-## Filename fragments to look for in the fetched icon pack, best first. Kenney's
-## on-screen controls pack does not name things the way this game does, so each
-## button lists what it would accept rather than one exact filename.
+## The icon each button wears, by exact filename in the fetched pack.
+##
+## Fuzzy matching put a gamepad "A" on the trigger and a "Y" on the grenade,
+## because "buttona" contains "button" and the pack is mostly gamepad glyphs.
+## These are named outright — and where the pack has nothing that means the
+## right thing, the entry is empty and the drawn glyph stands, which is why
+## grenade, prone and swap are still drawn.
 const WANTED := {
-	"fire":    ["shootbutton", "buttona", "circle", "target", "crosshair"],
-	"jump":    ["arrowup", "up_", "buttonb", "chevronup"],
-	"reload":  ["return", "reload", "refresh", "rotate", "buttonx"],
-	"grenade": ["bomb", "grenade", "buttony", "star"],
-	"sprint":  ["arrowright", "right_", "fast", "forward"],
-	"crouch":  ["arrowdown", "down_", "chevrondown"],
-	"prone":   ["minus", "bar", "line", "dash"],
-	"swap":    ["swap", "exchange", "switch", "arrowleftright", "shuffle"],
+	"fire":    "target.png",
+	"jump":    "arrowUp.png",
+	"reload":  "return.png",
+	"sprint":  "fastForward.png",
+	"crouch":  "arrowDown.png",
+	"grenade": "",
+	"prone":   "",
+	"swap":    "",
 }
 
 const ICON_DIRECTORY := "res://assets/icons/"
@@ -57,21 +61,21 @@ static func _scan() -> void:
 		if name.ends_with(".png"):
 			_catalogue.append(name)
 
-## The best match in the fetched pack, or null to fall back to a drawn glyph.
+## The named icon, or null to fall back to a drawn glyph.
 static func _find_texture(icon_kind: String) -> Texture2D:
-	_scan()
-	if _catalogue.is_empty():
+	var wanted := String(WANTED.get(icon_kind, ""))
+	if wanted == "":
 		return null
-	for fragment in WANTED.get(icon_kind, []):
-		for file in _catalogue:
-			if file.to_lower().find(String(fragment)) == -1:
-				continue
-			var path := ICON_DIRECTORY + file
-			if not ResourceLoader.exists(path):
-				continue
-			var texture := load(path)
-			if texture is Texture2D:
-				return texture
+	_scan()
+	for file in _catalogue:
+		if file.to_lower() != wanted.to_lower():
+			continue
+		var path := ICON_DIRECTORY + file
+		if not ResourceLoader.exists(path):
+			continue
+		var texture := load(path)
+		if texture is Texture2D:
+			return texture
 	return null
 
 func _draw() -> void:
