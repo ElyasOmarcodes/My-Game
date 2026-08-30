@@ -86,7 +86,17 @@ func _build_placeholder(weapon: Dictionary) -> void:
 ## another down -Z, and an .obj from a 3ds Max exporter is usually Z-up. The
 ## correction is per weapon, in the catalogue, rather than guessed here.
 func _orient(instance: Node3D, weapon: Dictionary) -> void:
-	instance.rotation_degrees = weapon.get("model_rotation", Vector3.ZERO)
+	if weapon.has("model_rotation"):
+		instance.rotation_degrees = weapon["model_rotation"]
+	else:
+		# Nothing stated: lay the model's longest side down -Z, which is where
+		# the agent is looking. The thirteen-weapon pack has no two guns facing
+		# the same way, and one of them was carried pointing at the sky.
+		var bounds := ModelUtils.visual_bounds(instance)
+		if bounds.size.x > bounds.size.z and bounds.size.x > bounds.size.y:
+			instance.rotation_degrees = Vector3(0, 90, 0)
+		elif bounds.size.y > bounds.size.z and bounds.size.y > bounds.size.x:
+			instance.rotation_degrees = Vector3(90, 0, 0)
 	instance.position = weapon.get("model_offset", Vector3.ZERO)
 
 ## A tint only where there is nothing to tint over. The supplied guns carry

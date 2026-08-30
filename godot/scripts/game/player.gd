@@ -178,6 +178,7 @@ func _build_model() -> void:
 			ModelUtils.rest_on_ground(instance)
 			_animation = _find_animation_player(instance)
 			_stance_pose = StancePose.new(instance)
+			ModelUtils.clothe(instance, Color(0.13, 0.15, 0.19))
 			_tint(instance)
 	else:
 		_build_placeholder()

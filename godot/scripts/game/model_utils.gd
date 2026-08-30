@@ -203,6 +203,31 @@ static func fit_height_world(node: Node3D, target: float) -> void:
 		inherited = maxf(parent.global_transform.basis.get_scale().y, 0.0001)
 	fit_height(node, target / inherited)
 
+## Gives an untextured model a colour of its own.
+##
+## The supplied SWAT body has no textures in it at all, so it imports as default
+## grey. Anything that does carry a texture is left alone — repainting those
+## would throw away the reason for having them.
+static func clothe(model: Node3D, colour: Color) -> void:
+	for node in _mesh_nodes(model):
+		var mesh_instance := node as MeshInstance3D
+		if mesh_instance == null or mesh_instance.mesh == null:
+			continue
+		var textured := false
+		for i in mesh_instance.mesh.get_surface_count():
+			var material := mesh_instance.get_active_material(i)
+			if material is BaseMaterial3D \
+					and (material as BaseMaterial3D).albedo_texture != null:
+				textured = true
+				break
+		if textured:
+			continue
+		var kit := StandardMaterial3D.new()
+		kit.albedo_color = colour
+		kit.roughness = 0.78
+		kit.metallic = 0.06
+		mesh_instance.material_override = kit
+
 ## A box collider matching the model's own bounds, added under it.
 static func add_box_collider(model: Node3D, bounds: AABB, layer := 1) -> void:
 	if bounds.size == Vector3.ZERO:

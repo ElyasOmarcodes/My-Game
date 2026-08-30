@@ -297,9 +297,21 @@ for kit in onscreencontrols gameicons; do
 done
 # Only the handful the buttons actually wear. The two packs hold 800 PNGs
 # between them and all but five would be dead weight in the APK.
+# The white set, at 2x. The pack ships black and white variants and the buttons
+# tint their icon by multiplying — which leaves a black icon black whatever
+# colour it is given, as the last build showed on every button.
 for icon in target arrowUp arrowDown return fastForward; do
-  collect "$WORK/kenney/onscreencontrols" icons "$icon.png" 1
-  collect "$WORK/kenney/gameicons" icons "$icon.png" 1
+  for kit in gameicons onscreencontrols; do
+    found="$(find "$WORK/kenney/$kit" -ipath '*white*2x*' -iname "$icon.png" \
+      2>/dev/null | head -1)"
+    [ -n "$found" ] || found="$(find "$WORK/kenney/$kit" -ipath '*white*' \
+      -iname "$icon.png" 2>/dev/null | head -1)"
+    if [ -n "$found" ]; then
+      mkdir -p "$DEST/icons"
+      cp "$found" "$DEST/icons/$icon.png" && echo "    icons  $icon.png"
+      break
+    fi
+  done
 done
 
 # --- the supplied models ------------------------------------------------------

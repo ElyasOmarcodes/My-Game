@@ -51,6 +51,7 @@ func _ready() -> void:
 			ModelUtils.rest_on_ground(instance)
 			_animation = _find_animation_player(instance)
 			_model = instance
+			ModelUtils.clothe(instance, Color(0.13, 0.15, 0.19))
 			_arm(library)
 	else:
 		var mesh := MeshInstance3D.new()
