@@ -37,11 +37,13 @@ func _ready() -> void:
 	var library: AssetLibrary = get_meta("library")
 	var scene: Resource = null
 	if library and library.has("characters"):
-		scene = library.find("characters", String(agent.get("model_hint", "")))
-		if scene == null:
-			scene = library.find("characters", "swat")
-		if scene == null:
-			scene = library.find("characters", "soldier")
+		# The body is the player's choice, not the agent's.
+		var body := AgentCatalog.body(String(
+			Session.get_pref("identity", "body", "recruit")))
+		for hint in [String(body.get("hint", "")), "universal", "swat", "soldier"]:
+			scene = library.find("characters", hint)
+			if scene != null:
+				break
 		if scene == null:
 			scene = library.pick("characters", AgentCatalog.agent_index(agent["id"]))
 

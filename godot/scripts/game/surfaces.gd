@@ -50,7 +50,7 @@ static func grass() -> StandardMaterial3D:
 ## Brick: staggered courses with mortar between them and a different tone on
 ## every brick, seamless because a course that runs off the right edge is the
 ## same course that comes back in on the left.
-static func brick(base: Color = Color(0.55, 0.30, 0.24)) -> StandardMaterial3D:
+static func brick(base: Color = Color(0.72, 0.44, 0.34)) -> StandardMaterial3D:
 	var key := "brick%s" % base.to_html(false)
 	return _make(key, func() -> StandardMaterial3D:
 		var image := Image.create(TILE, TILE, false, Image.FORMAT_RGB8)
@@ -98,7 +98,7 @@ static func brick(base: Color = Color(0.55, 0.30, 0.24)) -> StandardMaterial3D:
 		return material)
 
 ## Vertical boards with a gap between them and grain along their length.
-static func planks(base: Color = Color(0.45, 0.31, 0.19)) -> StandardMaterial3D:
+static func planks(base: Color = Color(0.58, 0.41, 0.26)) -> StandardMaterial3D:
 	var key := "planks%s" % base.to_html(false)
 	return _make(key, func() -> StandardMaterial3D:
 		var image := Image.create(TILE, TILE, false, Image.FORMAT_RGB8)

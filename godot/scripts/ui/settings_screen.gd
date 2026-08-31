@@ -36,6 +36,7 @@ func _ready() -> void:
 	column.add_child(UiTheme.spacer(8))
 
 	_build_identity(column)
+	_build_body(column)
 	_build_loadout(column)
 	_build_aim(column)
 	_build_map(column)
@@ -68,6 +69,39 @@ func _build_identity(parent: Control) -> void:
 	_name_field.text_changed.connect(on_name)
 	_name_field.text_submitted.connect(on_name)
 	column.add_child(_name_field)
+
+# --- who you look like --------------------------------------------------------
+
+func _build_body(parent: Control) -> void:
+	var column := _section(parent, "Body")
+	var chosen := String(Session.get_pref("identity", "body", "recruit"))
+
+	var note := UiTheme.label("", UiTheme.SIZE_SMALL, UiTheme.TEXT_MID)
+	var buttons: Dictionary = {}
+	var choose := func(entry: Dictionary) -> void:
+		Session.set_pref("identity", "body", String(entry.get("id", "")))
+		note.text = String(entry.get("note", ""))
+		for id in buttons:
+			var button: Button = buttons[id]
+			var picked: bool = id == String(entry.get("id", ""))
+			button.add_theme_stylebox_override("normal", UiTheme.fill(
+				Color(UiTheme.CYAN.r, UiTheme.CYAN.g, UiTheme.CYAN.b,
+					0.30 if picked else 0.08),
+				12, 2 if picked else 1,
+				UiTheme.CYAN if picked else UiTheme.LINE))
+
+	for entry in AgentCatalog.BODIES:
+		var button := UiTheme.button(String(entry.get("name", "")),
+			UiTheme.TEXT_HI, choose.bind(entry), 62)
+		buttons[String(entry.get("id", ""))] = button
+		column.add_child(button)
+	column.add_child(note)
+
+	for entry in AgentCatalog.BODIES:
+		if String(entry.get("id", "")) == chosen:
+			choose.call(entry)
+			return
+	choose.call(AgentCatalog.BODIES[0])
 
 # --- what you carry -----------------------------------------------------------
 

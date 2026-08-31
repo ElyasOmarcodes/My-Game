@@ -103,6 +103,30 @@ const WEAPONS := [
 ]
 
 ## Which weapons can go in which hand.
+## The bodies an agent can wear.
+##
+## The supplied SWAT operator looks the part but carries exactly one animation
+## clip inside the file — no walk, no run, no reload, no shot — so wearing it
+## means standing still whatever you are doing. Quaternius's rig is plainer but
+## brings the whole set with it. Both are offered; the animated one is default,
+## because that is what was actually wrong.
+const BODIES := [
+	{
+		"id": "recruit", "name": "Recruit", "hint": "universal",
+		"note": "Full animation set — walk, run, crouch, shoot, reload",
+	},
+	{
+		"id": "operator", "name": "SWAT Operator", "hint": "swat",
+		"note": "Your supplied model. One animation clip, so it does not move",
+	},
+]
+
+static func body(id: String) -> Dictionary:
+	for entry in BODIES:
+		if entry["id"] == id:
+			return entry
+	return BODIES[0]
+
 static func weapons_for_slot(slot: String) -> Array:
 	var found: Array = []
 	for entry in WEAPONS:
