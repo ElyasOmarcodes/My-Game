@@ -181,9 +181,24 @@ mkdir -p "$DEST/characters"
 fetch_model \
   "https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/Soldier.glb" \
   "Soldier.glb"
-fetch_model \
-  "https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/Xbot.glb" \
-  "Xbot.glb"
+
+# Quaternius's Universal Animation Library: one rig carrying 46 clips — idle,
+# walk, jog, sprint, crouch idle and crouch walk, the jump broken into start,
+# loop and land, and a whole pistol set (idle, aim up and down, shoot, reload).
+# CC0. This is the body the agents wear, because a body and its animations have
+# to come from the same rig; retargeting between two is where it falls apart.
+sparse_clone "https://github.com/J-Ponzo/gltf-universal-animation-library.git" \
+  ual "glTF"
+if [ -d "$WORK/ual/glTF" ]; then
+  echo "=== animation library ==="
+  cp "$WORK/ual/glTF/AnimationLibrary_Godot_Standard.gltf" \
+     "$DEST/characters/Universal.gltf"
+  cp "$WORK/ual/glTF/AnimationLibrary_Godot_Standard.bin" \
+     "$DEST/characters/AnimationLibrary_Godot_Standard.bin"
+  echo "    characters  +1  (Universal.gltf, 46 clips)"
+else
+  echo "::warning::animation library unavailable — agents fall back to Soldier"
+fi
 
 # --- what the kits actually contain -------------------------------------------
 
@@ -387,6 +402,7 @@ here anyway, because these artists made the game look like a game.
 | Starter-Kit-FPS (guns, gunfire) | Kenney | github.com/KenneyNL | CC0 1.0 |
 | On-screen controls, game icons | Kenney | kenney.nl | CC0 1.0 |
 | Weapon sound library (PPSh) | Still North Media | github.com/PanderMusubi | CC0 1.0 |
+| Universal Animation Library | Quaternius | quaternius.com | CC0 1.0 |
 | SWAT Operator, M4A4, AK-47, AWP, grenade | supplied by the repository owner | — | as supplied |
 | Soldier.glb, Xbot.glb | Mixamo (Adobe) | three.js examples, MIT repository | see below |
 

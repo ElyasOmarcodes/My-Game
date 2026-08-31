@@ -16,7 +16,7 @@ var alive := true
 
 var _target_position := Vector3.ZERO
 var _target_yaw := 0.0
-var _animation: AnimationPlayer
+var _animator: AgentAnimator
 var _last_position := Vector3.ZERO
 var _model: Node3D
 var _mount: WeaponMount
@@ -39,6 +39,8 @@ func _ready() -> void:
 	if library and library.has("characters"):
 		scene = library.find("characters", String(agent.get("model_hint", "")))
 		if scene == null:
+			scene = library.find("characters", "swat")
+		if scene == null:
 			scene = library.find("characters", "soldier")
 		if scene == null:
 			scene = library.pick("characters", AgentCatalog.agent_index(agent["id"]))
@@ -49,7 +51,7 @@ func _ready() -> void:
 			add_child(instance)
 			ModelUtils.fit_height(instance, 1.8)
 			ModelUtils.rest_on_ground(instance)
-			_animation = _find_animation_player(instance)
+			_animator = AgentAnimator.new(instance)
 			_model = instance
 			ModelUtils.clothe(instance, Color(0.13, 0.15, 0.19))
 			_arm(library)
@@ -112,20 +114,5 @@ func _process(delta: float) -> void:
 		_mount.follow(global_rotation.y)
 
 func _drive_animation(speed: float) -> void:
-	if _animation == null:
-		return
-	var wanted := "Idle" if speed < 0.5 else ("Run" if speed > 7.0 else "Walk")
-	for name in _animation.get_animation_list():
-		if String(name).to_lower().find(wanted.to_lower()) != -1:
-			if _animation.current_animation != name:
-				_animation.play(name)
-			return
-
-func _find_animation_player(node: Node) -> AnimationPlayer:
-	if node is AnimationPlayer:
-		return node
-	for child in node.get_children():
-		var found := _find_animation_player(child)
-		if found:
-			return found
-	return null
+	if _animator != null and _animator.ready():
+		_animator.drive(speed, 0, false, false)

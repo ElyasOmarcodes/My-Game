@@ -228,6 +228,29 @@ static func clothe(model: Node3D, colour: Color) -> void:
 		kit.metallic = 0.06
 		mesh_instance.material_override = kit
 
+## Pushes a model's own colours towards a target hue without flattening them.
+##
+## The nature kit's trees import a washed-out teal, and repainting them one flat
+## green would lose the trunk along with it. Each material's albedo is scaled
+## per channel instead, so a teal canopy comes out green and a brown trunk stays
+## brown.
+static func recolour(model: Node3D, scale: Vector3, lift := 1.0) -> void:
+	for node in _mesh_nodes(model):
+		var mesh_instance := node as MeshInstance3D
+		if mesh_instance == null or mesh_instance.mesh == null:
+			continue
+		for i in mesh_instance.mesh.get_surface_count():
+			var source := mesh_instance.get_active_material(i)
+			if not (source is BaseMaterial3D):
+				continue
+			var copy := (source as BaseMaterial3D).duplicate() as BaseMaterial3D
+			var was := copy.albedo_color
+			copy.albedo_color = Color(
+				clampf(was.r * scale.x * lift, 0.0, 1.0),
+				clampf(was.g * scale.y * lift, 0.0, 1.0),
+				clampf(was.b * scale.z * lift, 0.0, 1.0), was.a)
+			mesh_instance.set_surface_override_material(i, copy)
+
 ## A box collider matching the model's own bounds, added under it.
 static func add_box_collider(model: Node3D, bounds: AABB, layer := 1) -> void:
 	if bounds.size == Vector3.ZERO:

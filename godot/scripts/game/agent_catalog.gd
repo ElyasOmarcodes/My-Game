@@ -11,25 +11,25 @@ const AGENTS := [
 		"id": "vanguard", "name": "Vanguard", "role": "Assault",
 		"blurb": "Front-line breacher. Trades range for raw pressure.",
 		"health": 100.0, "speed": 7.4, "accent": Color("#3BE8FF"),
-		"model_hint": "swat", "weapon": "m4a4", "sidearm": "sidearm",
+		"model_hint": "universal", "weapon": "m4a4", "sidearm": "sidearm",
 	},
 	{
 		"id": "spectre", "name": "Spectre", "role": "Recon",
 		"blurb": "Silent flanker. Fastest boots in the squad.",
 		"health": 100.0, "speed": 8.2, "accent": Color("#B58CFF"),
-		"model_hint": "swat", "weapon": "smg", "sidearm": "machinepistol",
+		"model_hint": "universal", "weapon": "smg", "sidearm": "machinepistol",
 	},
 	{
 		"id": "forge", "name": "Forge", "role": "Engineer",
 		"blurb": "Holds ground. Deploys cover and repairs armour.",
 		"health": 100.0, "speed": 6.9, "accent": Color("#FFB23B"),
-		"model_hint": "swat", "weapon": "ak47", "sidearm": "revolver",
+		"model_hint": "universal", "weapon": "ak47", "sidearm": "revolver",
 	},
 	{
 		"id": "reaper", "name": "Reaper", "role": "Marksman",
 		"blurb": "One breath, one shot. Devastating at range.",
 		"health": 100.0, "speed": 7.2, "accent": Color("#FF4D5E"),
-		"model_hint": "swat", "weapon": "awp", "sidearm": "sidearm",
+		"model_hint": "universal", "weapon": "awp", "sidearm": "sidearm",
 	},
 ]
 

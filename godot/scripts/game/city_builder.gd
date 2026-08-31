@@ -178,10 +178,7 @@ func _build_ground() -> void:
 	mesh.mesh = plane
 	mesh.position.y = -0.5
 
-	var material := StandardMaterial3D.new()
-	material.albedo_color = Color(0.47, 0.43, 0.35)
-	material.roughness = 0.95
-	mesh.material_override = material
+	mesh.material_override = Surfaces.dirt()
 	add_child(mesh)
 
 func _build_roads() -> void:
@@ -203,10 +200,7 @@ func _road_strip(centre: Vector3, size: Vector3) -> void:
 	mesh.mesh = box
 	mesh.position = centre
 
-	var material := StandardMaterial3D.new()
-	material.albedo_color = Color(0.20, 0.20, 0.21)
-	material.roughness = 0.85
-	mesh.material_override = material
+	mesh.material_override = Surfaces.asphalt()
 	add_child(mesh)
 
 # --- blocks -------------------------------------------------------------------
@@ -248,9 +242,7 @@ func _build_park(centre: Vector3) -> void:
 	mesh.mesh = box
 	mesh.position = centre + Vector3(0, 0.1, 0)
 
-	var material := StandardMaterial3D.new()
-	material.albedo_color = Color(0.30, 0.42, 0.22)
-	mesh.material_override = material
+	mesh.material_override = Surfaces.grass()
 	add_child(mesh)
 
 	for i in 8:
@@ -266,6 +258,8 @@ func _build_park(centre: Vector3) -> void:
 ## wall module itself.
 var _cell := 0.0        ## world size of one module cell
 var _face_yaw := 0.0    ## turn that makes a wall module face -Z
+var _brick_material: StandardMaterial3D
+var _plank_material: StandardMaterial3D
 var _measured := false
 
 func _measure_module() -> void:
@@ -273,6 +267,8 @@ func _measure_module() -> void:
 		return
 	_measured = true
 	_cell = STOREY_HEIGHT
+	_brick_material = Surfaces.brick()
+	_plank_material = Surfaces.planks()
 
 	var wall: Resource = _wall_scene("wall")
 	if wall == null:
@@ -410,16 +406,18 @@ func _build_interior(shell: Node3D, width: int, depth: int, storeys: int,
 	var half_x := width * _cell * 0.5
 	var half_z := depth * _cell * 0.5
 
-	# The stair runs up one corner, so it never blocks the doorway.
-	var stair_x := half_x - _cell * 0.5
-	var stair_z := half_z - _cell * 0.5
-	var hatch := Vector2(stair_x, stair_z)
+	# The run needs to be longer than the rise or the slope is unclimbable, so
+	# the stair lies along the back wall — the longest clear line in the house —
+	# and the hatch sits at the top of it.
+	var run := maxf(width * _cell * 0.7, STOREY_HEIGHT * 1.45)
+	var stair_z := half_z - _cell * 0.55
+	var hatch := Vector2(run * 0.5 - _cell * 0.5, stair_z)
 
 	for level in storeys:
 		var y := level * STOREY_HEIGHT
 		if level > 0:
 			_floor_with_hole(shell, y, width, depth, hatch)
-		_staircase(shell, Vector3(stair_x, y, stair_z))
+		_staircase(shell, Vector3(0.0, y, stair_z), run, true)
 
 	# The roof gets the same hole, so the stair actually reaches open air.
 	_roof_hatch(shell, storeys * STOREY_HEIGHT, hatch)
@@ -458,26 +456,51 @@ func _plate(shell: Node3D, centre: Vector3, size: Vector3) -> void:
 	shell.add_child(mesh)
 	_slab(shell, centre, size)
 
-## A run of steps, each one its own step rather than a ramp, so the character
-## controller climbs it the way it climbs a kerb.
-func _staircase(shell: Node3D, base: Vector3) -> void:
-	var steps := 12
+## A staircase: visible steps, and one smooth ramp underneath them that is what
+## the player actually walks on.
+##
+## Two things stopped the old stair being climbable. A CharacterBody3D does not
+## step up onto anything by itself, so twelve separate boxes were twelve walls;
+## and the run was shorter than the rise, which put the slope at 48 degrees —
+## past floor_max_angle, so even a ramp would have counted as a wall and slid
+## the player back down. It runs along the back of the house now, long enough to
+## climb.
+func _staircase(shell: Node3D, base: Vector3, run: float, along_x: bool) -> void:
+	var steps := 14
 	var rise := STOREY_HEIGHT / steps
-	var run := (_cell * 0.9) / steps
+	var tread := run / steps
+	var width := _cell * 0.85
 
 	for i in steps:
-		var y := base.y + rise * (i + 1)
-		var z := base.z - _cell * 0.45 + run * i
+		var travel := tread * (i + 0.5) - run * 0.5
+		var centre := Vector3(
+			base.x + (travel if along_x else 0.0),
+			base.y + rise * (i + 0.5),
+			base.z + (0.0 if along_x else travel))
 		var mesh := MeshInstance3D.new()
 		var box := BoxMesh.new()
-		box.size = Vector3(_cell * 0.8, rise, run)
+		box.size = Vector3(tread if along_x else width, rise,
+			width if along_x else tread)
 		mesh.mesh = box
-		mesh.position = Vector3(base.x, y - rise * 0.5, z)
-		var material := StandardMaterial3D.new()
-		material.albedo_color = Color(0.42, 0.36, 0.28)
-		mesh.material_override = material
+		mesh.position = centre
+		mesh.material_override = _plank_material
 		shell.add_child(mesh)
-		_slab(shell, mesh.position, box.size)
+
+	# The ramp is invisible and is the only part with a collider: the steps are
+	# what you see, this is what you climb.
+	var slope := StaticBody3D.new()
+	slope.collision_layer = 1
+	var shape := CollisionShape3D.new()
+	var slab := BoxShape3D.new()
+	var length := sqrt(run * run + STOREY_HEIGHT * STOREY_HEIGHT)
+	slab.size = Vector3(length if along_x else width, 0.30,
+		width if along_x else length)
+	shape.shape = slab
+	slope.add_child(shape)
+	slope.position = base + Vector3(0, STOREY_HEIGHT * 0.5, 0)
+	var pitch := atan2(STOREY_HEIGHT, run)
+	slope.rotation = Vector3(0, 0, -pitch) if along_x else Vector3(pitch, 0, 0)
+	shell.add_child(slope)
 
 ## The opening in the roof, framed so it reads as a hatch from above.
 func _roof_hatch(shell: Node3D, y: float, hole: Vector2) -> void:
@@ -505,6 +528,15 @@ func _wall(shell: Node3D, family: String, at: Vector3, yaw: float,
 	piece.position = at
 	piece.rotation.y = deg_to_rad(yaw + _face_yaw)
 	shell.add_child(piece)
+	_surface_wall(piece, family)
+
+## Brick on the stone houses, boards on the wooden ones — one texture across a
+## whole house, so a street reads as built rather than as assembled.
+func _surface_wall(piece: Node3D, family: String) -> void:
+	var material: StandardMaterial3D = _plank_material if family == "wallWood" \
+		else _brick_material
+	for node in piece.find_children("*", "MeshInstance3D", true, false):
+		(node as MeshInstance3D).material_override = material
 
 func _cap_roof(shell: Node3D, width: int, depth: int, storeys: int) -> void:
 	var top := storeys * STOREY_HEIGHT
@@ -557,8 +589,12 @@ func _place_prop(hint: String, position: Vector3, yaw: float) -> void:
 		# Everything you can walk into is solid. A tree you stroll through is
 		# worse than no tree, and benches and barrels are cover in a fight.
 		var tall := hint == "tree"
-		_instance(scene, position, yaw, true, 0.0,
+		var model := _instance(scene, position, yaw, true, 0.0,
 			randf_range(5.0, 7.5) if tall else 0.95)
+		if tall and model != null:
+			# The kit's foliage imports a washed-out teal. Push the green up and
+			# the blue down: the canopy goes green and the trunk stays brown.
+			ModelUtils.recolour(model, Vector3(0.80, 1.28, 0.42), 1.05)
 	elif hint == "tree":
 		_primitive_block(position, Vector3(0.42, 4.4, 0.42), Color(0.24, 0.16, 0.10), true)
 		_primitive_block(position + Vector3(0, 3.6, 0), Vector3(3.2, 2.6, 3.2),
@@ -571,10 +607,10 @@ func _place_prop(hint: String, position: Vector3, yaw: float) -> void:
 ## Instances a kit piece and, when it should block movement, wraps it in a body
 ## sized to its own bounds — the kits ship visuals only, no collision.
 func _instance(scene: Resource, position: Vector3, yaw: float, solid: bool,
-		fit_width := 0.0, fit_height := 0.0) -> void:
+		fit_width := 0.0, fit_height := 0.0) -> Node3D:
 	var model := ModelUtils.spawn(scene)
 	if model == null:
-		return
+		return null
 	model.position = position
 	model.rotation.y = deg_to_rad(yaw)
 	add_child(model)
@@ -588,10 +624,8 @@ func _instance(scene: Resource, position: Vector3, yaw: float, solid: bool,
 		var largest := maxf(bounds.size.x, bounds.size.z)
 		model.scale = Vector3.ONE * clampf(fit_width / largest, 0.5, 3.5)
 
-	if not solid:
-		return
-	if bounds.size == Vector3.ZERO:
-		return
+	if not solid or bounds.size == Vector3.ZERO:
+		return model
 
 	var body := StaticBody3D.new()
 	body.collision_layer = 1
@@ -611,6 +645,7 @@ func _instance(scene: Resource, position: Vector3, yaw: float, solid: bool,
 	shape.position = bounds.get_center()
 	body.add_child(shape)
 	model.add_child(body)
+	return model
 
 func _visual_bounds(node: Node3D) -> AABB:
 	var bounds := AABB()

@@ -70,7 +70,7 @@ var _sensitivity := 0.20
 var _spring: SpringArm3D
 var _camera: Camera3D
 var _model_root: Node3D
-var _animation: AnimationPlayer
+var _animator: AgentAnimator
 var _muzzle: Node3D
 var _muzzle_flash: OmniLight3D
 var _mount: WeaponMount
@@ -80,7 +80,6 @@ var _controls: TouchControls
 var _library: AssetLibrary
 var _shape: CollisionShape3D
 var _capsule: CapsuleShape3D
-var _stance_pose: StancePose
 
 static func create(library: AssetLibrary, agent_id: String, team_value: int,
 		player_identifier: String, local: bool) -> Player:
@@ -142,10 +141,8 @@ func set_stance(value: int) -> void:
 		var rise := create_tween()
 		rise.tween_property(_spring, "position:y", float(STANCE_EYE[stance]), 0.18)
 
-	# The body actually folds. Prone additionally pitches the whole model down
-	# onto its front, which no amount of bone rotation can stand in for.
-	if _stance_pose != null:
-		_stance_pose.set_stance(stance)
+	# Crouch is a real clip on this rig, so the animator has it. Prone is not —
+	# no pack ships one — so the body is pitched onto its front instead.
 	if _model_root:
 		var lie := create_tween()
 		lie.set_parallel(true)
@@ -164,6 +161,8 @@ func _build_model() -> void:
 	if _library and _library.has("characters"):
 		scene = _library.find("characters", String(agent.get("model_hint", "")))
 		if scene == null:
+			scene = _library.find("characters", "swat")
+		if scene == null:
 			scene = _library.find("characters", "soldier")
 		if scene == null:
 			scene = _library.pick("characters", AgentCatalog.agent_index(agent["id"]))
@@ -176,8 +175,7 @@ func _build_model() -> void:
 			# tall out of the box. Everyone stands 1.8 m here.
 			ModelUtils.fit_height(instance, 1.8)
 			ModelUtils.rest_on_ground(instance)
-			_animation = _find_animation_player(instance)
-			_stance_pose = StancePose.new(instance)
+			_animator = AgentAnimator.new(instance)
 			ModelUtils.clothe(instance, Color(0.13, 0.15, 0.19))
 			_tint(instance)
 	else:
@@ -276,15 +274,6 @@ func _tint(node: Node) -> void:
 			child.material_overlay = overlay
 		_tint(child)
 
-func _find_animation_player(node: Node) -> AnimationPlayer:
-	if node is AnimationPlayer:
-		return node
-	for child in node.get_children():
-		var found := _find_animation_player(child)
-		if found:
-			return found
-	return null
-
 func _build_camera() -> void:
 	_spring = SpringArm3D.new()
 	_spring.spring_length = CAMERA_DISTANCE
@@ -293,7 +282,17 @@ func _build_camera() -> void:
 	add_child(_spring)
 
 	_camera = Camera3D.new()
-	_camera.fov = float(Session.get_pref("aim", "fov", 74.0))
+	# The field of view is measured across the screen, not down it.
+	#
+	# Godot measures it vertically by default, which on a phone held sideways
+	# turns a 74-degree setting into about 118 degrees horizontally — and a
+	# rectilinear lens that wide stretches everything away from the centre. That
+	# is why something looked one size in the middle of the screen and a
+	# different shape near the edge. Measured across, the number means what it
+	# says, it is the same framing on every phone whatever its aspect, and 72
+	# is narrow enough that the stretch at the edges stops reading.
+	_camera.keep_aspect = Camera3D.KEEP_WIDTH
+	_camera.fov = float(Session.get_pref("aim", "fov", 72.0))
 	_camera.current = true
 	_spring.add_child(_camera)
 
@@ -317,8 +316,6 @@ func _physics_process(delta: float) -> void:
 	_stride += planar * delta * 2.4
 	_drive_animation(planar)
 	_carry_weapon()
-	if _stance_pose != null:
-		_stance_pose.advance(delta)
 
 func _carry_weapon() -> void:
 	if _mount != null:
@@ -397,24 +394,15 @@ func _try_jump() -> void:
 		if stance != 0:
 			set_stance(0)
 
+## Hands the body what it is doing and lets the driver pick the clip.
 func _drive_animation(planar_speed: float) -> void:
-	if _animation == null:
+	if _animator == null or not _animator.ready():
 		# Placeholder body: swing it slightly so movement reads without a rig.
 		if _model_root:
-			_model_root.rotation.z = sin(_stride) * 0.04 * clampf(planar_speed / 6.0, 0.0, 1.0)
+			_model_root.rotation.z = sin(_stride) * 0.04 \
+				* clampf(planar_speed / 6.0, 0.0, 1.0)
 		return
-
-	var wanted := "Idle" if planar_speed < 0.4 else ("Run" if planar_speed > 7.0 else "Walk")
-	var chosen := _match_animation(wanted)
-	if chosen != "" and _animation.current_animation != chosen:
-		_animation.play(chosen)
-
-func _match_animation(wanted: String) -> String:
-	var lowered := wanted.to_lower()
-	for name in _animation.get_animation_list():
-		if String(name).to_lower().find(lowered) != -1:
-			return name
-	return ""
+	_animator.drive(planar_speed, stance, not is_on_floor(), velocity.y > 0.5)
 
 # --- combat -------------------------------------------------------------------
 
@@ -462,6 +450,8 @@ func fire() -> void:
 	var origin: Vector3 = _mount.barrel() if _mount != null else eye
 	_report_shot(origin, landed)
 	_kick()
+	if _animator != null:
+		_animator.fire_once("shoot")
 
 ## Everything a shot does that is not damage: the flash, the tracer and the
 ## report. Without these a hit that lands looks exactly like one that misses,
@@ -570,6 +560,8 @@ func reload() -> void:
 	var seconds := float(weapon_def.get("reload", 1.6))
 	_reload_until = now + seconds
 	Sfx.play("reload", 0.7)
+	if _animator != null:
+		_animator.fire_once("reload")
 	await get_tree().create_timer(seconds).timeout
 
 	var needed: int = clip - ammo_in_clip
@@ -583,6 +575,8 @@ func apply_damage(amount: float, attacker_id: String) -> void:
 		return
 	health = maxf(0.0, health - amount)
 	health_changed.emit(health, max_health)
+	if _animator != null:
+		_animator.fire_once("death" if health <= 0.0 else "hit")
 	if health <= 0.0:
 		_die(attacker_id)
 

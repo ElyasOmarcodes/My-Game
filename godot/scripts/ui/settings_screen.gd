@@ -147,15 +147,18 @@ func _build_aim(parent: Control) -> void:
 	sensitivity_label.text = "Look sensitivity   %.2f" % _sensitivity.value
 	column.add_child(_sensitivity)
 
+	column.add_child(UiTheme.label(
+		"A wider view stretches whatever is near the edges of the screen. "
+		+ "Narrow it if that bothers you.", UiTheme.SIZE_SMALL, UiTheme.TEXT_MID))
 	var fov_label := UiTheme.label("", UiTheme.SIZE_BODY, UiTheme.TEXT_HI)
 	column.add_child(fov_label)
-	_fov = UiTheme.slider(60.0, 95.0,
-		float(Session.get_pref("aim", "fov", 74.0)), 1.0)
+	_fov = UiTheme.slider(55.0, 95.0,
+		float(Session.get_pref("aim", "fov", 72.0)), 1.0)
 	var on_fov := func(value: float) -> void:
 		Session.set_pref("aim", "fov", value)
-		fov_label.text = "Field of view   %d" % int(value)
+		fov_label.text = "Field of view (across)   %d" % int(value)
 	_fov.value_changed.connect(on_fov)
-	fov_label.text = "Field of view   %d" % int(_fov.value)
+	fov_label.text = "Field of view (across)   %d" % int(_fov.value)
 	column.add_child(_fov)
 
 # --- which world --------------------------------------------------------------

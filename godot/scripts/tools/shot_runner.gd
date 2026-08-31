@@ -32,6 +32,7 @@ func _ready() -> void:
 	_city.build(_library, SEED)
 
 	_camera = Camera3D.new()
+	_camera.keep_aspect = Camera3D.KEEP_WIDTH
 	_camera.current = true
 	add_child(_camera)
 

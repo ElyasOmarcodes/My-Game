@@ -9,8 +9,8 @@ its own.
 import json
 import sys
 
-REQUIRED = {"walls": 5, "roofs": 3, "props": 20, "characters": 2, "weapons": 6}
-OPTIONAL = ["map", "throwables", "icons"]
+REQUIRED = {"walls": 5, "roofs": 3, "props": 20, "characters": 2, "icons": 3, "weapons": 6}
+OPTIONAL = ["map", "throwables"]
 MANIFEST = "godot/assets/manifest.json"
 
 
