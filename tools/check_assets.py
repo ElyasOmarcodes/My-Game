@@ -7,9 +7,10 @@ quietly falls back to grey boxes. Every category the world needs is checked on
 its own.
 """
 import json
+import os
 import sys
 
-REQUIRED = {"walls": 5, "roofs": 3, "props": 20, "characters": 2, "icons": 3, "weapons": 6}
+REQUIRED = {"walls": 5, "roofs": 3, "props": 20, "characters": 2, "weapons": 6}
 OPTIONAL = ["map", "throwables"]
 MANIFEST = "godot/assets/manifest.json"
 
@@ -23,6 +24,16 @@ def main() -> int:
         print("  %-12s %3d  (need %d)" % (category, found, minimum))
         if found < minimum:
             short.append("%s %d<%d" % (category, found, minimum))
+
+    # Icons and audio are files on disk, not models, so they never appear in
+    # the manifest — which lists only what the loader can instantiate. Counting
+    # them there reported zero for something that was working perfectly well.
+    for folder, minimum in (("icons", 3), ("audio", 4)):
+        path = os.path.join("godot", "assets", folder)
+        found = len(os.listdir(path)) if os.path.isdir(path) else 0
+        print("  %-12s %3d  (need %d, on disk)" % (folder, found, minimum))
+        if found < minimum:
+            short.append("%s %d<%d" % (folder, found, minimum))
 
     for category in OPTIONAL:
         found = len(catalog.get(category, []))
